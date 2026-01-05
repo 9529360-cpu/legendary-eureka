@@ -14,6 +14,7 @@
 import ApiService from "../services/ApiService";
 import { IntentSpec, IntentType, IntentSpecData } from "./types/intent";
 import { parseLlmOutput } from "./utils/llmOutputParser";
+import { mapToSemanticAtoms, compressToSuperIntent } from "./utils/semanticMapper";
 
 // ========== 解析上下文 ==========
 
@@ -73,14 +74,24 @@ export class IntentParser {
       const text = response.message || "";
       console.log("[IntentParser] LLM 返回:", text.substring(0, 300));
 
+      // 先做语义映射（保证在 LLM 未返回结构化数据时仍能做基本路由）
+      const atomsFromUser = mapToSemanticAtoms(context.userMessage);
+      const compressed = compressToSuperIntent(atomsFromUser);
+
       // 使用鲁棒解析器先尝试提取 JSON
       const parsedResult = parseLlmOutput(text);
       if (!parsedResult.ok) {
         console.warn("[IntentParser] 无法从 LLM 输出解析 JSON，降级处理：", parsedResult.error);
-        return this.createFallbackSpec(context.userMessage);
+        const fallback = this.createFallbackSpec(context.userMessage);
+        fallback.semanticAtoms = atomsFromUser;
+        fallback.compressedIntent = compressed;
+        return fallback;
       }
 
-      return this.validateAndConvert(parsedResult.data, context);
+      const spec = this.validateAndConvert(parsedResult.data, context);
+      spec.semanticAtoms = atomsFromUser;
+      spec.compressedIntent = compressed;
+      return spec;
     } catch (error) {
       console.error("[IntentParser] 解析失败:", error);
       return this.createFallbackSpec(context.userMessage);

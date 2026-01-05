@@ -85,6 +85,10 @@ export interface IntentSpec {
 
   /** LLM 的思考过程 */
   reasoning?: string;
+  /** 语义原子映射，用于快速路由与决策 */
+  semanticAtoms?: string[];
+  /** 压缩意图（automation|failure|structure|maintainability） */
+  compressedIntent?: 'automation' | 'failure' | 'structure' | 'maintainability';
 }
 
 /**
