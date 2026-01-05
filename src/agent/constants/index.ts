@@ -6,12 +6,7 @@
  * @packageDocumentation
  */
 
-import type {
-  FriendlyError,
-  RetryStrategy,
-  SelfHealingAction,
-  InteractionConfig,
-} from "../types";
+import type { FriendlyError, RetryStrategy, SelfHealingAction, InteractionConfig } from "../types";
 import type { ExpertAgentConfig } from "../types/config";
 
 // ========== 错误映射常量 ==========
@@ -19,10 +14,7 @@ import type { ExpertAgentConfig } from "../types/config";
 /**
  * v2.9.20: 友好错误消息映射
  */
-export const FRIENDLY_ERROR_MAP: Record<
-  string,
-  Omit<FriendlyError, "code" | "originalMessage">
-> = {
+export const FRIENDLY_ERROR_MAP: Record<string, Omit<FriendlyError, "code" | "originalMessage">> = {
   RangeNotFound: {
     friendlyMessage: "找不到指定的单元格范围",
     possibleCauses: ["范围地址格式错误", "工作表名称不正确", "指定的单元格不存在"],

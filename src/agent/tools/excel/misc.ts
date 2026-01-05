@@ -109,8 +109,5 @@ export function createClarifyRequestTool(): Tool {
  * 创建所有其他工具
  */
 export function createMiscTools(): Tool[] {
-  return [
-    createRespondToUserTool(),
-    createClarifyRequestTool(),
-  ];
+  return [createRespondToUserTool(), createClarifyRequestTool()];
 }

@@ -237,7 +237,9 @@ export class LLMResponseValidator {
       const result = LLMResponseSchema.safeParse(data);
 
       if (result.success) {
-        Logger.debug(this.MODULE_NAME, "Validation successful", { operation: result.data.operation });
+        Logger.debug(this.MODULE_NAME, "Validation successful", {
+          operation: result.data.operation,
+        });
         return { success: true, data: result.data };
       }
 
@@ -318,7 +320,10 @@ export class LLMResponseValidator {
       // 构建修复提示
       const repairPrompt = this.buildRepairPrompt(currentInput, result);
 
-      Logger.info(this.MODULE_NAME, "Attempting repair", { attempt: attempts, error: result.error?.message });
+      Logger.info(this.MODULE_NAME, "Attempting repair", {
+        attempt: attempts,
+        error: result.error?.message,
+      });
 
       try {
         // 调用 LLM 进行修复
@@ -603,7 +608,9 @@ ${result.recovery?.suggestion ?? "请确保响应是有效的 JSON，且包含�
     error: z.ZodError
   ): ValidationResult<ExecutionPlan>["recovery"] {
     const missingFields = error.issues
-      .filter((i) => i.code === "invalid_type" && (i as { received?: string }).received === "undefined")
+      .filter(
+        (i) => i.code === "invalid_type" && (i as { received?: string }).received === "undefined"
+      )
       .map((i) => i.path.join("."));
 
     if (missingFields.length > 0) {

@@ -35,8 +35,7 @@ export function createWorkflowEvent<T>(eventType: string) {
       data,
       timestamp: new Date(),
     }),
-    is: (event: WorkflowEvent<unknown>): event is WorkflowEvent<T> =>
-      event.type === eventType,
+    is: (event: WorkflowEvent<unknown>): event is WorkflowEvent<T> => event.type === eventType,
   };
 }
 
@@ -228,8 +227,7 @@ export class WorkflowEventRegistry implements WorkflowEventRegistryInterface {
   private handlers = new Map<string, WorkflowEventHandler[]>();
 
   handle<T>(event: WorkflowEvent<T>, handler: WorkflowEventHandler<T>): this {
-    const eventType =
-      event.type || (event as unknown as { name: string }).name || String(event);
+    const eventType = event.type || (event as unknown as { name: string }).name || String(event);
     if (!this.handlers.has(eventType)) {
       this.handlers.set(eventType, []);
     }
@@ -266,8 +264,7 @@ export class WorkflowEventRegistry implements WorkflowEventRegistryInterface {
  */
 export class WorkflowEventStream implements WorkflowEventStreamInterface {
   private events: Array<{ type: string; payload: unknown }> = [];
-  private stopCondition: ((event: { type: string; payload: unknown }) => boolean) | null =
-    null;
+  private stopCondition: ((event: { type: string; payload: unknown }) => boolean) | null = null;
   private isStopped = false;
 
   push(event: WorkflowEvent<unknown> | { type: string; payload: unknown }): void {
@@ -320,10 +317,7 @@ export function createSimpleWorkflow(): SimpleWorkflow {
   const stream = new WorkflowEventStream();
 
   const workflow: SimpleWorkflow = {
-    on<T>(
-      eventType: string | WorkflowEvent<T>,
-      handler: WorkflowEventHandler<T>
-    ): SimpleWorkflow {
+    on<T>(eventType: string | WorkflowEvent<T>, handler: WorkflowEventHandler<T>): SimpleWorkflow {
       const type = typeof eventType === "string" ? eventType : eventType.type;
       const wrappedEvent = { type } as WorkflowEvent<T>;
       registry.handle(wrappedEvent, handler);

@@ -242,7 +242,10 @@ export class ToolSelector {
       name: tool.name,
     });
 
-    Logger.debug(this.MODULE_NAME, "Tool registered", { name: tool.name, category: inferredMeta.category });
+    Logger.debug(this.MODULE_NAME, "Tool registered", {
+      name: tool.name,
+      category: inferredMeta.category,
+    });
   }
 
   /**

@@ -98,10 +98,7 @@ export type WorkflowEventHandler<T = unknown> = (
  * v2.9.60: 工作流执行器接口
  */
 export interface SimpleWorkflow {
-  on<T>(
-    eventType: string | WorkflowEvent<T>,
-    handler: WorkflowEventHandler<T>
-  ): SimpleWorkflow;
+  on<T>(eventType: string | WorkflowEvent<T>, handler: WorkflowEventHandler<T>): SimpleWorkflow;
   run(context: WorkflowContextInterface): Promise<WorkflowEventStreamInterface>;
   getStream(): WorkflowEventStreamInterface;
   getRegistry(): WorkflowEventRegistryInterface;

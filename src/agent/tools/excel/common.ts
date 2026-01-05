@@ -64,10 +64,7 @@ export function extractSheetName(input: Record<string, unknown>): string | null 
 /**
  * 智能提取地址参数（兼容多种写法）
  */
-export function extractAddress(
-  input: Record<string, unknown>,
-  defaultValue = "A1:A10"
-): string {
+export function extractAddress(input: Record<string, unknown>, defaultValue = "A1:A10"): string {
   return String(
     input.address || input.range || input.cell || input.area || input.targetRange || defaultValue
   );
@@ -121,11 +118,7 @@ export function numberToColumnLetter(num: number): string {
 /**
  * 格式化数据预览
  */
-export function formatDataPreview(
-  values: unknown[][],
-  maxRows = 10,
-  maxCols = 10
-): string {
+export function formatDataPreview(values: unknown[][], maxRows = 10, maxCols = 10): string {
   return values
     .slice(0, maxRows)
     .map((row) =>

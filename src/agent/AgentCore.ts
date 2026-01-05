@@ -134,6 +134,7 @@ import {
   WorkflowEventStream,
   createSimpleWorkflow,
 } from "./workflow";
+import type { WorkflowState } from "./workflow";
 
 // ========== 常量（从 constants 模块导入） ==========
 import {

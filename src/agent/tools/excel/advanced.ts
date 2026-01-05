@@ -354,7 +354,8 @@ export function createGeometricShapeTool(): Tool {
       {
         name: "shapeType",
         type: "string",
-        description: "形状类型: 'rectangle', 'oval', 'triangle', 'diamond', 'star5', 'arrow', 'heart'",
+        description:
+          "形状类型: 'rectangle', 'oval', 'triangle', 'diamond', 'star5', 'arrow', 'heart'",
         required: true,
       },
       { name: "left", type: "number", description: "左边距(像素)", required: false },

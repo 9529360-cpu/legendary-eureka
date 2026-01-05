@@ -261,7 +261,10 @@ export class EpisodicMemory {
     };
     this.currentSteps = [];
 
-    Logger.debug(this.MODULE_NAME, "Episode started", { id, request: userRequest.substring(0, 50) });
+    Logger.debug(this.MODULE_NAME, "Episode started", {
+      id,
+      request: userRequest.substring(0, 50),
+    });
 
     return id;
   }

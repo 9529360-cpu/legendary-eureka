@@ -44,7 +44,16 @@ const mockLocalStorage = (() => {
 Object.defineProperty(global, "localStorage", { value: mockLocalStorage });
 
 // 忽略未使用的类型导入（用于类型检查）
-const _typeCheck: Environment | ApiConfig | ExcelConfig | AgentConfig | UiConfig | LoggingConfig | SecurityConfig | FeatureFlags | null = null;
+const _typeCheck:
+  | Environment
+  | ApiConfig
+  | ExcelConfig
+  | AgentConfig
+  | UiConfig
+  | LoggingConfig
+  | SecurityConfig
+  | FeatureFlags
+  | null = null;
 void _typeCheck;
 
 describe("ConfigManager", () => {

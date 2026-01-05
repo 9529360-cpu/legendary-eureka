@@ -11,6 +11,34 @@ UI Layer (React)  →  Agent Layer  →  Tool Layer  →  Excel JavaScript API
    App.tsx           AgentCore.ts    ExcelAdapter.ts    Office.Excel.run()
 ```
 
+### 模块化目录结构 (v3.1.0+)
+
+```
+src/agent/
+├── AgentCore.ts              # Agent 核心逻辑
+├── ExcelAdapter.ts           # Excel 工具入口
+├── types/                    # 类型定义
+│   ├── tool.ts               # Tool, ToolResult 等
+│   ├── task.ts               # AgentTask, AgentStep 等
+│   └── ...
+├── workflow/                 # 工作流系统
+│   └── WorkflowEngine.ts
+├── constants/                # 常量定义
+├── registry/                 # 工具注册中心
+│   └── ToolRegistry.ts
+└── tools/excel/              # Excel 工具分类
+    ├── read.ts               # 读取类 (6个)
+    ├── write.ts              # 写入类 (2个)
+    ├── formula.ts            # 公式类 (5个)
+    ├── format.ts             # 格式化类 (6个)
+    ├── chart.ts              # 图表类 (2个)
+    ├── data.ts               # 数据操作类 (13个)
+    ├── sheet.ts              # 工作表类 (6个)
+    ├── analysis.ts           # 分析类 (8个)
+    ├── advanced.ts           # 高级工具 (11个)
+    └── misc.ts               # 其他 (2个)
+```
+
 ### 关键设计原则
 
 1. **UI 只负责展示** - 所有 Excel 操作通过 Agent 工具层执行，UI 层不直接调用 Excel API
@@ -43,7 +71,9 @@ npm run test          # 运行 Jest 测试
 所有 Excel 操作必须在 `Excel.run()` 上下文中执行：
 
 ```typescript
-// ✅ 正确: 在 ExcelAdapter 中封装
+// ✅ 正确: 在工具文件中使用 excelRun
+import { excelRun } from './common';
+
 async execute() {
   return await excelRun(async (ctx) => {
     const range = ctx.workbook.getActiveCell();
@@ -58,10 +88,10 @@ async execute() {
 
 ### 添加新 Agent 工具
 
-在 [src/agent/ExcelAdapter.ts](src/agent/ExcelAdapter.ts) 中添加：
+**推荐方式**: 在对应类别文件中添加 (如 `src/agent/tools/excel/data.ts`)
 
 ```typescript
-function createMyNewTool(): Tool {
+export function createMyNewTool(): Tool {
   return {
     name: "excel_my_tool",           // 必须以 excel_ 前缀
     description: "描述用于 LLM 理解",  // 中文描述
@@ -72,7 +102,9 @@ function createMyNewTool(): Tool {
 }
 ```
 
-然后在 `createExcelTools()` 函数中注册。
+然后在该文件的 `createXxxTools()` 函数中注册。
+
+**兼容方式**: 仍可在 `ExcelAdapter.ts` 的 `createExcelTools()` 中直接添加。
 
 ### React 组件模式
 
@@ -84,15 +116,21 @@ function createMyNewTool(): Tool {
 ### 类型定义
 
 - 核心类型: `src/types/index.ts`
-- Agent 类型: `src/agent/AgentCore.ts` 中导出
-- 工具定义: `src/core/ToolRegistry.ts`
+- Agent 类型: `src/agent/types/` 模块 (Tool, ToolResult, AgentTask, AgentStep 等)
+- 工作流类型: `src/agent/workflow/` (WorkflowEngine, WorkflowState)
+- 工具定义: `src/agent/registry/ToolRegistry.ts`
+- Excel 工具: `src/agent/tools/excel/` (分类工具实现)
 
 ## 关键文件
 
 | 文件 | 用途 |
 |---|---|
 | [src/agent/AgentCore.ts](src/agent/AgentCore.ts) | ReAct Agent 核心，任务执行循环 |
-| [src/agent/ExcelAdapter.ts](src/agent/ExcelAdapter.ts) | 所有 Excel 工具实现 (~90个工具) |
+| [src/agent/ExcelAdapter.ts](src/agent/ExcelAdapter.ts) | Excel 工具入口，兼容层 |
+| [src/agent/types/](src/agent/types/) | Agent 类型定义 (Tool, ToolResult, AgentTask 等) |
+| [src/agent/workflow/](src/agent/workflow/) | 工作流引擎 (WorkflowEngine) |
+| [src/agent/registry/](src/agent/registry/) | 工具注册中心 |
+| [src/agent/tools/excel/](src/agent/tools/excel/) | 分类 Excel 工具 (61个工具) |
 | [src/taskpane/hooks/useAgent.ts](src/taskpane/hooks/useAgent.ts) | UI 调用 Agent 的 hook |
 | [src/services/ApiService.ts](src/services/ApiService.ts) | AI 后端 API 调用 |
 | [ai-backend.cjs](ai-backend.cjs) | Express 后端，对接 DeepSeek API |
