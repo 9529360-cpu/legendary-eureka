@@ -179,7 +179,7 @@ export class Executor {
             result: result.result,
             error: result.error,
             executionTime: result.executionTime,
-            affectedRange: result.result?.affectedRange,
+            affectedRange: (result.result as any)?.affectedRange,
           });
 
           // 添加调用之间的延迟（如果需要）

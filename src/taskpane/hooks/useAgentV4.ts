@@ -32,13 +32,13 @@ import {
 
 export type AgentV4Status =
   | "idle"
-  | "parsing"      // 意图解析中
-  | "compiling"    // 规格编译中
-  | "executing"    // 执行中
+  | "parsing" // 意图解析中
+  | "compiling" // 规格编译中
+  | "executing" // 执行中
   | "completed"
   | "failed"
   | "cancelled"
-  | "pending"      // 等待用户确认
+  | "pending" // 等待用户确认
   | "awaiting_approval"; // 等待审批
 
 export interface AgentV4Progress {
@@ -144,10 +144,10 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
 
   // v4 执行器实例
   const executorRef = React.useRef<AgentExecutor | null>(null);
-  
+
   // 旧版 Agent 实例（兼容层）
   const legacyAgentRef = React.useRef<Agent | null>(null);
-  
+
   // 步骤回调 ref（兼容旧版）
   const stepCallbackRef = React.useRef<((step: string) => void) | null>(null);
 
@@ -174,7 +174,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
 
     // 订阅事件
     executor.on("intent:parsed", (data) => {
-      const { intent } = data as { intent: IntentSpec };
+      const { intent } = (data as unknown) as { intent: IntentSpec };
       if (verboseLogging) {
         console.log("[AgentV4] 意图解析完成:", intent.intent);
       }
@@ -192,12 +192,15 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
         },
       }));
 
-      addLog("think", `意图识别: ${intent.intent} (置信度: ${(intent.confidence * 100).toFixed(0)}%)`);
+      addLog(
+        "think",
+        `意图识别: ${intent.intent} (置信度: ${(intent.confidence * 100).toFixed(0)}%)`
+      );
       onEventRef.current?.("intent:parsed", data);
     });
 
     executor.on("plan:compiled", (data) => {
-      const { plan } = data as { plan: { steps: unknown[] } };
+      const { plan } = (data as unknown) as { plan: { steps: unknown[] } };
       const stepCount = plan.steps.length;
 
       if (verboseLogging) {
@@ -221,7 +224,11 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("step:start", (data) => {
-      const { step, index, total } = data as { step: { description: string }; index: number; total: number };
+      const { step, index, total } = (data as unknown) as {
+        step: { description: string };
+        index: number;
+        total: number;
+      };
 
       setState((prev) => ({
         ...prev,
@@ -240,7 +247,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("step:complete", (data) => {
-      const { step, result, index, total } = data as {
+      const { step, result, index, total } = (data as unknown) as {
         step: { description: string };
         result: { success: boolean };
         index: number;
@@ -268,7 +275,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("execution:complete", (data) => {
-      const { result } = data as { result: ExecutionResult };
+      const { result } = (data as unknown) as { result: ExecutionResult };
 
       if (verboseLogging) {
         console.log("[AgentV4] 执行完成:", result.success ? "成功" : "失败");
@@ -288,7 +295,9 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
           : null,
       }));
 
-      addLog("info", result.success ? "✅ 任务完成" : `❌ 任务失败: ${result.error}`);
+      const resultError = (result as any).error ?? (result as any).errors ?? null;
+      const resultErrorMessage = Array.isArray(resultError) ? resultError.join("; ") : resultError;
+      addLog("info", result.success ? "✅ 任务完成" : `❌ 任务失败: ${resultErrorMessage}`);
       onEventRef.current?.("execution:complete", data);
     });
 
@@ -298,7 +307,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
 
   // 发送请求
   const send = React.useCallback(
-    async (request: string, context?: AgentV4Context): Promise<ExecutionResult> => {
+    async (request: string, context?: AgentV4Context): Promise<ExecutionResult | AgentTask> => {
       if (!executorRef.current) {
         throw new Error("Executor not initialized");
       }
@@ -337,16 +346,20 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
         const result = await executorRef.current.execute({
           userMessage: request,
           activeSheet: context?.activeSheet,
-          selection: context?.selection ? {
-            address: context.selection,
-          } : undefined,
-          workbookSummary: context?.workbookName ? {
-            sheetNames: [],
-          } : undefined,
+          selection: context?.selection
+            ? {
+                address: context.selection,
+              }
+            : undefined,
+          workbookSummary: context?.workbookName
+            ? {
+                sheetNames: [],
+              }
+            : undefined,
         });
 
         // 构造兼容的 AgentTask 对象
-        const compatibleTask: AgentTask = {
+        const compatibleTask: any = {
           id: `task_${Date.now()}`,
           request,
           status: result.success ? "completed" : "failed",
@@ -354,7 +367,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
           steps: [],
           startTime: new Date(),
           endTime: new Date(),
-          context: {},
+          context: { environment: context?.environment || "excel" } as any,
         };
 
         setState((prev) => ({
@@ -362,7 +375,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
           lastTask: compatibleTask,
         }));
 
-        return result;
+        return result as any;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -381,7 +394,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
           executedSteps: 0,
           totalSteps: 0,
           stepResults: [],
-        };
+        } as any;
       }
     },
     [addLog, maxIterations]
@@ -390,7 +403,11 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
   // 取消执行
   const cancel = React.useCallback(() => {
     if (legacyAgentRef.current) {
-      legacyAgentRef.current.cancel();
+      try {
+        (legacyAgentRef.current as any)?.cancel?.();
+      } catch (e) {
+        // ignore
+      }
     }
     setState((prev) => ({
       ...prev,
@@ -406,7 +423,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
   }, []);
 
   // ========== 旧版兼容 API ==========
-  
+
   const pause = React.useCallback(() => {
     console.warn("[useAgentV4] pause() is deprecated");
     return false;

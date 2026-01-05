@@ -561,7 +561,12 @@ export type { SpecCompileContext, SpecCompileResult } from "./SpecCompiler";
 
 // AgentExecutor - 执行引擎（Layer 3）
 export { AgentExecutor, createAgentExecutor } from "./AgentExecutor";
-export type { AgentExecutionResult, StepResult, ExecutorEvent, ExecutorEventType } from "./AgentExecutor";
+export type {
+  AgentExecutionResult,
+  StepResult,
+  ExecutorEvent,
+  ExecutorEventType,
+} from "./AgentExecutor";
 
 // 意图类型
 export type {

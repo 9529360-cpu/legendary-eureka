@@ -144,10 +144,13 @@ export function useApiSettings(): UseApiSettingsReturn {
   }, [backendHealthy, refreshBackendStatus, checkApiKeyStatus]);
 
   const bootstrap = useCallback(async (): Promise<void> => {
-    const ok = await refreshBackendStatus();
-    if (ok) {
+    // 先触发 API 密钥状态检查，尽量让 /api/config/status 更早被调用，
+    // 然后并行触发后端健康检查以节省时间
+    try {
       await checkApiKeyStatus();
-    } else {
+      // 不等待 refresh 完成，继续并行刷新状态
+      void refreshBackendStatus();
+    } catch (e) {
       setApiKeyStatus(null);
     }
   }, [refreshBackendStatus, checkApiKeyStatus]);

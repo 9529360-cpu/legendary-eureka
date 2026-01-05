@@ -617,7 +617,10 @@ class ConfigManagerClass {
 
   /** 是否为开发环境 */
   get isDevelopment(): boolean {
-    return this.config.environment === "development";
+    return (
+      this.config.environment === "development" ||
+      this.config.environment === "test"
+    );
   }
 
   /** 是否为生产环境 */

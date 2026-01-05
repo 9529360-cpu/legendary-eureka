@@ -127,9 +127,7 @@ describe("v4.0 Architecture Integration", () => {
       expect(result.plan!.steps.length).toBeGreaterThan(0);
 
       // 验证格式化工具被使用
-      const hasFormatStep = result.plan!.steps.some(
-        (step) => step.action === "excel_format_range"
-      );
+      const hasFormatStep = result.plan!.steps.some((step) => step.action === "excel_format_range");
       expect(hasFormatStep).toBe(true);
     });
 
@@ -159,9 +157,7 @@ describe("v4.0 Architecture Integration", () => {
       const readStepIndex = steps.findIndex(
         (s) => s.action.includes("read") || s.action.includes("get")
       );
-      const writeStepIndex = steps.findIndex(
-        (s) => s.action.includes("write")
-      );
+      const writeStepIndex = steps.findIndex((s) => s.action.includes("write"));
 
       // 读取步骤应该在写入步骤之前
       if (readStepIndex !== -1 && writeStepIndex !== -1) {

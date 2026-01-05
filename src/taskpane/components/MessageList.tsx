@@ -190,7 +190,18 @@ export const MessageList: React.FC<MessageListProps> = ({
   // 滚动到底部
   const scrollToBottom = React.useCallback(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      const el = messagesEndRef.current as HTMLElement & { scrollIntoView?: unknown };
+      if (typeof el.scrollIntoView === "function") {
+        // 优先使用原生 scrollIntoView
+        (el.scrollIntoView as (opts?: ScrollIntoViewOptions) => void)({ behavior: "smooth" });
+      } else if (containerRef.current) {
+        // jsdom 环境可能没有实现 scrollIntoView，回退到设置容器滚动位置
+        try {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        } catch (e) {
+          // 忽略任何在非浏览器环境可能抛出的错误
+        }
+      }
     }
   }, []);
   

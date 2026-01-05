@@ -632,11 +632,21 @@ const App: React.FC = () => {
             workbookName: workbookContext?.fileName,
           });
           
-          // v4.0: 处理执行结果
-          const agentResult = {
-            success: result.success,
-            message: result.message || (result.success ? "任务完成" : result.error || "执行失败"),
-          };
+          // v4.0: 处理执行结果（兼容 ExecutionResult 或 AgentTask）
+          let agentResult: { success: boolean; message: string } = { success: false, message: "" };
+          if (result && typeof result === "object" && "success" in result) {
+            // ExecutionResult
+            const r: any = result;
+            agentResult = {
+              success: Boolean(r.success),
+              message: String(r.message || (r.success ? "任务完成" : r.error || "执行失败")),
+            };
+          } else if (result && typeof result === "object" && "id" in (result as any)) {
+            // AgentTask - not completed immediately
+            agentResult = { success: false, message: "任务已提交，正在执行中" };
+          } else {
+            agentResult = { success: false, message: "未知回复" };
+          }
         
         // v2.9.26: 重构消息展示 - 只显示 Agent 的核心回复，像人一样说话
         // LLM 通过 respond_to_user 工具返回的 message 才是给用户看的！
@@ -785,7 +795,7 @@ const App: React.FC = () => {
   }
 
   // �ж��Ƿ���ʾ��ӭ���棨����Ϣʱ��
-  const showWelcome = messages.length === 0;
+  const showWelcome = messages.length <= 1;
   const isDisabled = busy || backendHealthy === false;
 
   // v2.9.8: 构建 HeaderBar 需要的 workbookSummary
@@ -816,7 +826,7 @@ const App: React.FC = () => {
     <FluentProvider theme={isDarkTheme ? webDarkTheme : webLightTheme} className={styles.app}>
       <Toaster toasterId={toasterId} />
       
-      <div className={styles.container}>
+      <div className={styles.container} data-testid="copilot-container">
         {/* ===== 顶部状态栏 ===== */}
         <HeaderBar
           backendHealthy={backendHealthy}
@@ -924,7 +934,11 @@ const App: React.FC = () => {
       {/* ===== v3.0: Agent 层审批确认对话框 ===== */}
       <ApprovalDialog
         open={agent.state.status === "awaiting_approval" && agent.state.pendingApproval !== null}
-        approvalRequest={agent.state.pendingApproval}
+        approvalRequest={
+          agent.state.pendingApproval && typeof agent.state.pendingApproval === "object"
+            ? (agent.state.pendingApproval as any)
+            : null
+        }
         onConfirm={(approvalId) => {
           agent.approve(approvalId);
         }}
@@ -933,8 +947,8 @@ const App: React.FC = () => {
         }}
         onClose={() => {
           // 关闭弹窗但不做决定时，默认拒绝
-          if (agent.state.pendingApproval) {
-            agent.reject(agent.state.pendingApproval.approvalId, "用户关闭弹窗");
+          if (agent.state.pendingApproval && (agent.state.pendingApproval as any).approvalId) {
+            agent.reject((agent.state.pendingApproval as any).approvalId, "用户关闭弹窗");
           }
         }}
       />

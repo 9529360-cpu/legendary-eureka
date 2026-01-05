@@ -40,15 +40,22 @@ export async function scanWorkbook(onProgress?: ProgressCallback): Promise<Workb
 
     const context = await Excel.run(async (ctx) => {
       const workbook = ctx.workbook;
-      workbook.load("name");
+      // 在测试环境中，ctx.workbook 可能是部分模拟对象，先检查 load 是否存在
+      if (workbook && typeof workbook.load === "function") {
+        workbook.load("name");
+      }
 
       // 加载所有工作表
-      const sheets = workbook.worksheets;
-      sheets.load("items/name, items/position");
+      const sheets = workbook && workbook.worksheets;
+      if (sheets && typeof sheets.load === "function") {
+        sheets.load("items/name, items/position");
+      }
 
       // 加载命名范围
-      const namedItems = workbook.names;
-      namedItems.load("items/name, items/value, items/comment, items/scope");
+      const namedItems = workbook && workbook.names;
+      if (namedItems && typeof namedItems.load === "function") {
+        namedItems.load("items/name, items/value, items/comment, items/scope");
+      }
 
       await ctx.sync();
       updateProgress(20, "扫描工作表");

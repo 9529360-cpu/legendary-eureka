@@ -1,18 +1,18 @@
 /**
  * IntentParser - 意图解析器 v4.0
- * 
+ *
  * Layer 1: 调用 LLM 理解用户意图，输出高层规格
- * 
+ *
  * ★★★ 核心设计原则 ★★★
  * 1. LLM System Prompt 不包含任何工具名 (如 excel_xxx)
  * 2. LLM 只输出业务意图和规格
  * 3. 工具调用由 SpecCompiler 负责，不是 LLM
- * 
+ *
  * @module agent/IntentParser
  */
 
-import ApiService from '../services/ApiService';
-import { IntentSpec, IntentType, IntentSpecData } from './types/intent';
+import ApiService from "../services/ApiService";
+import { IntentSpec, IntentType, IntentSpecData } from "./types/intent";
 
 // ========== 解析上下文 ==========
 
@@ -22,7 +22,7 @@ import { IntentSpec, IntentType, IntentSpecData } from './types/intent';
 export interface ParseContext {
   /** 用户原始请求 */
   userMessage: string;
-  
+
   /** 当前选区信息 */
   selection?: {
     address: string;
@@ -30,18 +30,18 @@ export interface ParseContext {
     rowCount?: number;
     columnCount?: number;
   };
-  
+
   /** 当前工作表名 */
   activeSheet?: string;
-  
+
   /** 工作簿概要 */
   workbookSummary?: {
     sheetNames: string[];
     tableNames?: string[];
   };
-  
+
   /** 对话历史 */
-  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 // ========== IntentParser 类 ==========
@@ -50,50 +50,48 @@ export interface ParseContext {
  * 意图解析器 - 调用 LLM 理解用户意图
  */
 export class IntentParser {
-  
   /**
    * 解析用户意图
-   * 
+   *
    * @param context 解析上下文
    * @returns 意图规格
    */
   async parse(context: ParseContext): Promise<IntentSpec> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(context);
-    
+
     try {
-      console.log('[IntentParser] 正在解析用户意图...');
-      
+      console.log("[IntentParser] 正在解析用户意图...");
+
       const response = await ApiService.sendAgentRequest({
         message: userPrompt,
         systemPrompt,
-        responseFormat: 'json',
+        responseFormat: "json",
       });
-      
-      const text = response.message || '';
-      console.log('[IntentParser] LLM 返回:', text.substring(0, 300));
-      
+
+      const text = response.message || "";
+      console.log("[IntentParser] LLM 返回:", text.substring(0, 300));
+
       // 解析 JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        console.warn('[IntentParser] LLM 未返回有效 JSON');
+        console.warn("[IntentParser] LLM 未返回有效 JSON");
         return this.createFallbackSpec(context.userMessage);
       }
-      
+
       const parsed = JSON.parse(jsonMatch[0]);
       return this.validateAndConvert(parsed, context);
-      
     } catch (error) {
-      console.error('[IntentParser] 解析失败:', error);
+      console.error("[IntentParser] 解析失败:", error);
       return this.createFallbackSpec(context.userMessage);
     }
   }
-  
+
   /**
    * 构建 System Prompt
-   * 
+   *
    * ★★★ 关键: 不包含任何工具名 ★★★
-   * 
+   *
    * @public 暴露给测试使用
    */
   buildSystemPrompt(): string {
@@ -229,21 +227,23 @@ export class IntentParser {
 3. 只输出 JSON，不要其他内容
 4. 不要过度澄清，用户会觉得你很蠢`;
   }
-  
+
   /**
    * 构建用户 Prompt
-   * 
+   *
    * @public 暴露给测试使用
    */
-  buildUserPrompt(context: ParseContext | { userInput?: string; workbookContext?: Record<string, unknown> }): string {
+  buildUserPrompt(
+    context: ParseContext | { userInput?: string; workbookContext?: Record<string, unknown> }
+  ): string {
     // 兼容两种调用方式
     let userMessage: string;
-    let selection: ParseContext['selection'] | undefined;
+    let selection: ParseContext["selection"] | undefined;
     let activeSheet: string | undefined;
-    let workbookSummary: ParseContext['workbookSummary'] | undefined;
-    let conversationHistory: ParseContext['conversationHistory'] | undefined;
+    let workbookSummary: ParseContext["workbookSummary"] | undefined;
+    let conversationHistory: ParseContext["conversationHistory"] | undefined;
 
-    if ('userMessage' in context) {
+    if ("userMessage" in context) {
       // ParseContext 格式
       userMessage = context.userMessage;
       selection = context.selection;
@@ -252,7 +252,7 @@ export class IntentParser {
       conversationHistory = context.conversationHistory;
     } else {
       // 简化格式
-      userMessage = context.userInput || '';
+      userMessage = context.userInput || "";
       activeSheet = context.workbookContext?.activeSheet as string | undefined;
       const workbookName = context.workbookContext?.workbookName;
       if (workbookName) {
@@ -261,35 +261,35 @@ export class IntentParser {
     }
 
     let prompt = `用户请求: ${userMessage}\n\n`;
-    
+
     if (selection) {
       prompt += `当前选区: ${selection.address}`;
       if (selection.rowCount && selection.columnCount) {
         prompt += ` (${selection.rowCount}行 × ${selection.columnCount}列)`;
       }
-      prompt += '\n';
+      prompt += "\n";
     }
-    
+
     if (activeSheet) {
       prompt += `当前工作表: ${activeSheet}\n`;
     }
-    
+
     if (workbookSummary) {
-      prompt += `工作簿包含: ${workbookSummary.sheetNames.join(', ')}\n`;
+      prompt += `工作簿包含: ${workbookSummary.sheetNames.join(", ")}\n`;
     }
-    
+
     if (conversationHistory && conversationHistory.length > 0) {
-      prompt += '\n对话历史:\n';
+      prompt += "\n对话历史:\n";
       const recent = conversationHistory.slice(-4);
       for (const msg of recent) {
-        prompt += `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content.substring(0, 100)}\n`;
+        prompt += `${msg.role === "user" ? "用户" : "助手"}: ${msg.content.substring(0, 100)}\n`;
       }
     }
-    
-    prompt += '\n请分析用户意图并输出 JSON。';
+
+    prompt += "\n请分析用户意图并输出 JSON。";
     return prompt;
   }
-  
+
   /**
    * 验证并转换 LLM 输出
    */
@@ -297,21 +297,21 @@ export class IntentParser {
     // 验证必需字段
     const intent = parsed.intent as IntentType;
     if (!intent) {
-      console.warn('[IntentParser] 缺少 intent 字段');
+      console.warn("[IntentParser] 缺少 intent 字段");
       return this.createFallbackSpec(context.userMessage);
     }
-    
-    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
+
+    const confidence = typeof parsed.confidence === "number" ? parsed.confidence : 0.5;
     const needsClarification = Boolean(parsed.needsClarification);
-    
+
     // 构建规格
     let spec: IntentSpecData;
-    if (parsed.spec && typeof parsed.spec === 'object') {
+    if (parsed.spec && typeof parsed.spec === "object") {
       spec = parsed.spec as IntentSpecData;
     } else {
-      spec = { type: 'respond', message: '无法解析规格' };
+      spec = { type: "respond", message: "无法解析规格" };
     }
-    
+
     return {
       intent,
       confidence,
@@ -322,20 +322,20 @@ export class IntentParser {
       reasoning: parsed.reasoning as string | undefined,
     };
   }
-  
+
   /**
    * 创建降级规格
    */
   private createFallbackSpec(userMessage: string): IntentSpec {
     return {
-      intent: 'clarify',
+      intent: "clarify",
       confidence: 0.3,
       needsClarification: true,
-      clarificationQuestion: '抱歉，我没有完全理解您的请求。您能具体说明一下想做什么吗？',
+      clarificationQuestion: "抱歉，我没有完全理解您的请求。您能具体说明一下想做什么吗？",
       spec: {
-        type: 'clarify',
-        question: '请更具体地描述您的需求',
-        reason: '无法解析用户意图',
+        type: "clarify",
+        question: "请更具体地描述您的需求",
+        reason: "无法解析用户意图",
       },
     };
   }

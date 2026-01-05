@@ -303,9 +303,10 @@ class ToolExecutorClass {
           };
         } catch (error) {
           lastError = error as Error;
-          retryCount++;
 
-          if (retryCount <= maxRetries) {
+          // 仅在确实要重试时增加 retryCount，避免多计数
+          if (retryCount < maxRetries) {
+            retryCount++;
             const delay =
               (options.retryDelay || TIMEOUTS.RETRY_BASE_DELAY) * Math.pow(2, retryCount - 1);
             Logger.warn(
@@ -317,7 +318,11 @@ class ToolExecutorClass {
               }
             );
             await this.delay(delay);
+            // 继续下一次重试
+            continue;
           }
+          // 不再重试，跳出循环
+          break;
         }
       }
 
@@ -606,7 +611,9 @@ class ToolExecutorClass {
         const expectedType = param.type;
         const actualType = Array.isArray(value) ? "array" : typeof value;
 
-        if (expectedType !== actualType && expectedType !== "any") {
+        const exp = String(expectedType);
+        const act = String(actualType);
+        if (exp !== act && exp !== "any") {
           // 尝试类型转换
           if (expectedType === "string" && actualType !== "string") {
             warnings.push(`参数 ${param.name} 类型不匹配，已自动转换为字符串`);

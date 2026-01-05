@@ -8,7 +8,7 @@
 
 // v4.0: 新架构 - useAgentV4 作为主要 Agent Hook
 export { useAgentV4, useAgentV4 as useAgent } from "./useAgentV4";
-export type { 
+export type {
   UseAgentV4Options as UseAgentOptions,
   UseAgentV4Return as UseAgentReturn,
   AgentV4State as AgentState,

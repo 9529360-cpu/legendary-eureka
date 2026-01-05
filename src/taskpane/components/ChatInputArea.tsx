@@ -67,7 +67,7 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   onSend,
   busy,
   backendHealthy,
-  placeholder = "描述你想对数据做的操作...",
+  placeholder = "输入自然语言指令",
 }) => {
   const styles = useStyles();
 

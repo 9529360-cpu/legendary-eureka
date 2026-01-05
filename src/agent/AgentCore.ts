@@ -8555,7 +8555,7 @@ ${expandedDataStr}
     const startCell = baseAddress.split(":")[0]; // 取 A1:G1 中的 A1
     const colMatch = startCell.match(/^([A-Z]+)/i);
     const rowMatch = startCell.match(/(\d+)$/);
-    
+
     if (!colMatch || !rowMatch) {
       return { success: false, output: "地址格式无效", error: "Invalid address format" };
     }
