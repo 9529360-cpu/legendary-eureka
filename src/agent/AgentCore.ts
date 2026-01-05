@@ -16962,3 +16962,8 @@ export function createAgent(config?: Partial<AgentConfig>): Agent {
 }
 
 export default Agent;
+
+// ========== 类型重导出（向后兼容）==========
+// 所有类型已抽取到 src/agent/types/ 目录
+// 为保持向后兼容性，从此处重导出
+export * from "./types";
