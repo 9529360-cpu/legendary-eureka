@@ -1,0 +1,41 @@
+<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
+<!-- This file shows how to design a first-run page that provides a welcome screen to the user about the features of the add-in. -->
+
+<!doctype html>
+<html lang="zh-CN" style="background-color: #292929;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Excel Copilot</title>
+
+    <!-- 防止加载时白色闪烁 -->
+    <style>
+      html, body, #app-body { 
+        background-color: #292929 !important; 
+        margin: 0; 
+        padding: 0; 
+      }
+    </style>
+
+    <!-- Office JavaScript API -->
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+
+    <!-- For Fluent UI React, styles are handled by the components -->
+    <!-- Removed Office Fabric CSS to avoid style conflicts -->
+
+    <!-- Taskpane styles -->
+    <link href="taskpane.css" rel="stylesheet" type="text/css" />
+  </head>
+
+  <body style="background-color: #292929;">
+    <!-- React mounts into this element -->
+    <main id="app-body" style="background-color: #292929;"></main>
+
+    <!-- Optional: fallback text for very early load -->
+    <noscript>Enable JavaScript to use Excel Copilot.</noscript>
+  </body>
+</html>

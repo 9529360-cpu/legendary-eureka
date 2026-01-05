@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "jsx": "react-jsx",
+
+    "forceConsistentCasingInFileNames": true,
+
+    "noEmitOnError": true,
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    "module": "ES2020",
+    "moduleResolution": "node",
+
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  "exclude": ["node_modules", "dist", "frontend", "backups"],
+  "ts-node": {
+    "files": true
+  }
+}

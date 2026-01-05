@@ -1,0 +1,1722 @@
+﻿﻿import * as React from "react";
+import {
+  FluentProvider,
+  webDarkTheme,
+  webLightTheme,
+  makeStyles,
+  shorthands,
+  tokens,
+  Body1,
+  Body2,
+  Caption1,
+  Button,
+  Spinner,
+  Toaster,
+  useId,
+  useToastController,
+  Text,
+  Tooltip,
+  ProgressBar,
+  Divider,
+} from "@fluentui/react-components";
+import {
+  SparkleRegular,
+  TableSimpleRegular,
+  MathFormulaRegular,
+  ChartMultipleRegular,
+  SettingsRegular,
+  CheckmarkCircleRegular,
+  DismissCircleRegular,
+  ArrowUndoRegular,
+  ArrowSyncRegular,
+  LightbulbRegular,
+  BroomRegular,
+  PaintBrushRegular,
+  DataBarVerticalRegular,
+  FlashRegular,
+} from "@fluentui/react-icons";
+import { ErrorHandler } from "../../core/ErrorHandler";
+// v2.9.8: ApiService 调用已移至 hooks，仅保留类型导入
+import type { ChatRequest, ChatResponse, ApiKeyStatus } from "../../services/ApiService";
+import { DataAnalyzer } from "../../core/DataAnalyzer";
+// v2.9.8: Agent 初始化已移至 useAgent hook，仅保留类型导入
+import { AgentTask, AgentStep as AgentCoreStep } from "../../agent";
+// v2.9.8: 新增组件导入
+import { ChatInputArea } from "./ChatInputArea";
+import { ApiConfigDialog } from "./ApiConfigDialog";
+import { PreviewConfirmDialog } from "./PreviewConfirmDialog";
+import { HeaderBar } from "./HeaderBar";
+import { MessageList } from "./MessageList";
+import { WelcomeView } from "./WelcomeView";
+import { InsightPanel } from "./InsightPanel";
+import type { DataSummary as InsightDataSummary, ProactiveSuggestion as InsightSuggestion } from "./InsightPanel";
+
+// v2.9.8: 模块化重构 - 导入抽取的类型、工具函数和 hooks
+import { 
+  parseMessageContent, 
+  loadUserPreferences, 
+  saveUserPreferences,
+  // Excel 辅助函数
+  uid,
+  readSelection,
+  buildSelectionContext,
+  getCommandRangeAddress,
+  coerceCellValue,
+  normalizeHeaderList,
+  extractHeaders,
+  MAX_CONTEXT_ROWS,
+  MAX_CONTEXT_COLUMNS,
+  sliceSelectionValues,
+  // Excel 命令执行器 (v2.9.8 提取)
+  normalizeExcelCommandAction,
+  buildTabularValues,
+  getExcelCommandLabel,
+  validateAndFixCommand,
+  getActionTargetAddress,
+  convertAiResponseToCopilotResponse,
+  // v2.9.12: 数据分析纯函数
+  generateDataSummary,
+  generateProactiveSuggestions,
+  parseFormulaReferences,
+  analyzeFormulaComplexity,
+} from "../utils";
+import { useApiSettings, useAgent, useWorkbookContext } from "../hooks";
+import type {
+  CellValue,
+  CopilotAction,
+  SelectionResult,
+  ChatMessage,
+  DataInsight,
+  OperationHistoryItem,
+  UndoStackItem,
+  ProactiveSuggestion,
+  DataSummary,
+  UserPreferences,
+  OperationVerification,
+  AgentStepUI as AgentStep,
+  AgentThought,
+  AgentPlanUI as AgentPlan,
+  SheetInfo,
+  NamedRangeInfo,
+  TableInfo,
+  ChartInfo,
+  PivotTableInfo,
+  FormulaDependency,
+  DataRelationship,
+  WorkbookContext,
+} from "../types";
+
+type Role = "user" | "assistant";
+
+type ExcelCommand = NonNullable<ChatResponse["excelCommand"]>;
+
+// v2.9.8: 类型定义和工具函数已移至 ../types 和 ../utils
+
+interface CopilotResponse {
+  message: string;
+  actions: CopilotAction[];
+}
+
+
+
+// ========== Styles ==========
+// v2.9.8: 大部分样式已移至各子组件（HeaderBar, MessageList, WelcomeView, InsightPanel 等）
+
+const useStyles = makeStyles({
+  // ========== 根容器 ==========
+  app: {
+    minHeight: "100vh",
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorNeutralForeground1,
+    fontFamily: "Segoe UI, -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    maxWidth: "100%",
+  },
+
+  // ========== 对话区域 ==========
+  chatContainer: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  },
+
+  // ========== 进度条 ==========
+  progressWrapper: {
+    ...shorthands.padding("8px", "16px"),
+  },
+});
+
+// v2.9.9: applyExcelCommand 和 applyAction 已删除
+// 所有 Excel 操作现在通过 Agent 工具层执行 (src/agent/ExcelAdapter.ts)
+// UI 只负责展示，不直接调用 Excel API
+
+const App: React.FC = () => {
+  const styles = useStyles();
+  const errorHandler = ErrorHandler.getInstance();
+  const toasterId = useId("toaster");
+  const { dispatchToast } = useToastController(toasterId);
+
+  // v2.9.8: 使用 useApiSettings hook 管理后端连接和 API 密钥
+  const apiSettings = useApiSettings();
+  // v2.9.9: legacyChat 已删除，所有请求统一走 Agent
+  // v2.9.8: 使用 useAgent hook 管理 Agent 初始化和调用
+  const agent = useAgent({
+    maxIterations: 30,
+    enableMemory: true,
+    verboseLogging: true,
+  });
+
+  const [_dataAnalyzer] = React.useState(() => new DataAnalyzer());
+  
+  // ���ر������û�ƫ��
+  const [userPreferences, setUserPreferences] = React.useState<UserPreferences>(() => loadUserPreferences());
+
+  const [isDarkTheme, _setIsDarkTheme] = React.useState(userPreferences.theme === "dark");
+  const [_showSidebar, _setShowSidebar] = React.useState(false);
+  const [_showAnalysisPanel, _setShowAnalysisPanel] = React.useState(false);
+
+  const [messages, setMessages] = React.useState<ChatMessage[]>([
+    {
+      id: uid(),
+      role: "assistant",
+      text: "你好！👋 欢迎使用 Excel 智能助手。\n\n选中 Excel 中的数据，然后告诉我你想做什么，比如：\n• 「分析这些数据」\n• 「求和」\n• 「创建图表」",
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  // v2.9.9: streaming 状态变量已删除（统一走 Agent 模式）
+  const [lastSelection, setLastSelection] = React.useState<SelectionResult | null>(null);
+
+  const [_insights, _setInsights] = React.useState<DataInsight[]>([]);
+  const [analysisProgress, setAnalysisProgress] = React.useState(0);
+
+  const [_history, setHistory] = React.useState<OperationHistoryItem[]>([]);
+  const [_historyIndex, setHistoryIndex] = React.useState(-1);
+  
+  // ����ջ - ���������Ĳ���״̬���ڻع�
+  const [undoStack, setUndoStack] = React.useState<UndoStackItem[]>([]);
+  const MAX_UNDO_STACK = 10; // ���ౣ��10�β����ĳ�����Ϣ
+
+  // ����Ԥ����ȷ��
+  const [previewDialogOpen, setPreviewDialogOpen] = React.useState(false);
+  const [_pendingActions, setPendingActions] = React.useState<CopilotAction[]>([]);
+  const [previewMessage, setPreviewMessage] = React.useState("");
+  const [requireConfirmation, _setRequireConfirmation] = React.useState(true);
+
+  // v2.9.8: API 状态现在由 useApiSettings hook 管理
+  // 从 hook 解构出需要的状态（保持向后兼容的变量名）
+  const { 
+    backendHealthy, 
+    backendChecking, 
+    backendError: _backendError,
+    apiKeyStatus,
+    apiKeyBusy,
+  } = apiSettings;
+  
+  // UI 专属状态（dialog 开关、输入框等）保持在组件内
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = React.useState(false);
+  const [apiKeyInput, setApiKeyInput] = React.useState("");
+
+  // ===== ����ʽ Copilot ״̬ =====
+  const [proactiveSuggestions, setProactiveSuggestions] = React.useState<ProactiveSuggestion[]>([]);
+  const [dataSummary, setDataSummary] = React.useState<DataSummary | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const [autoAnalyzeEnabled, _setAutoAnalyzeEnabled] = React.useState(userPreferences.autoAnalyze);
+  const selectionDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // v2.9.12: 使用 useWorkbookContext hook 管理工作簿扫描
+  const {
+    workbookContext,
+    isScanning,
+    scanProgress,
+    scanWorkbook,
+    getWorkbookSummary,
+  } = useWorkbookContext();
+
+  // ===== Agent Loop 状态 (用于UI显示思维链) =====
+  const [_agentPlan, _setAgentPlan] = React.useState<AgentPlan | null>(null);
+  const [_agentThoughts, setAgentThoughts] = React.useState<AgentThought[]>([]);
+  const [isAgentRunning, setIsAgentRunning] = React.useState(false);
+  
+  // 用于实时更新 Agent 思考过程的 Ref
+  const currentAgentMsgIdRef = React.useRef<string | null>(null);
+  const agentStepsRef = React.useRef<string[]>([]);
+
+  // v2.9.8: Agent 初始化已移至 useAgent hook
+  // 保留 updateAgentMessageRef 用于 UI 更新
+  const updateAgentMessageRef = React.useRef<((step: string) => void) | null>(null);
+  
+  // 记录操作用于学习
+  function recordOperation(operation: string) {
+    setUserPreferences((prev) => {
+      const lastUsed = prev.lastUsedOperations.filter(
+        (op) => op.operation !== operation
+      );
+      lastUsed.unshift({ operation, timestamp: Date.now() });
+      // 只保留最近20条
+      const trimmed = lastUsed.slice(0, 20);
+      const newPrefs = { ...prev, lastUsedOperations: trimmed };
+      saveUserPreferences(newPrefs);
+      return newPrefs;
+    });
+  }
+
+  React.useEffect(() => {
+    void bootstrapBackendStatus();
+  }, []);
+
+  // ===== 主动式 Copilot：监听 Excel 选区变化 =====
+  React.useEffect(() => {
+    if (typeof Excel === "undefined") {
+      return;
+    }
+
+    // eslint-disable-next-line no-undef
+    let eventHandler: OfficeExtension.EventHandlerResult<Excel.SelectionChangedEventArgs> | null = null;
+
+    const setupSelectionListener = async () => {
+      try {
+        await Excel.run(async (context) => {
+          const workbook = context.workbook;
+          eventHandler = workbook.onSelectionChanged.add(handleSelectionChanged);
+          await context.sync();
+        });
+      } catch (error) {
+        console.warn("�޷�����ѡ������:", error);
+      }
+    };
+
+    void setupSelectionListener();
+
+    return () => {
+      // �����¼�����
+      if (eventHandler) {
+        void Excel.run(async (context) => {
+          eventHandler?.remove();
+          await context.sync();
+        });
+      }
+      if (selectionDebounceRef.current) {
+        clearTimeout(selectionDebounceRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * ����ѡ���仯�¼� - ��������
+   */
+  async function handleSelectionChanged(_event: Excel.SelectionChangedEventArgs): Promise<void> {
+    // ��������������Ƶ������
+    if (selectionDebounceRef.current) {
+      clearTimeout(selectionDebounceRef.current);
+    }
+
+    selectionDebounceRef.current = setTimeout(() => {
+      if (autoAnalyzeEnabled && !busy && !isAnalyzing) {
+        void performProactiveAnalysis();
+      }
+    }, 500); // 500ms ����
+  }
+
+  /**
+   * ִ����������
+   */
+  async function performProactiveAnalysis(): Promise<void> {
+    if (typeof Excel === "undefined") {
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      const selection = await readSelection();
+      
+      // ����ѡ��̫С������2�л�1�У��������з���
+      if (selection.rowCount < 2 || selection.columnCount < 1) {
+        setDataSummary(null);
+        setProactiveSuggestions([]);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      setLastSelection(selection);
+
+      // ������������ժҪ
+      const summary = generateDataSummary(selection);
+      setDataSummary(summary);
+
+      // �������������������ܽ���
+      const suggestions = generateProactiveSuggestions(selection, summary);
+      setProactiveSuggestions(suggestions);
+
+      // ���·�������
+      setAnalysisProgress(100);
+      setTimeout(() => setAnalysisProgress(0), 1000);
+
+    } catch (error) {
+      console.warn("��������ʧ��:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  // ===== ��ʽ�����������ߺ��� =====
+  
+  /**
+   * ������ʽ�����õĵ�Ԫ��/��Χ
+   * ����: =SUM(A1:A10) + B5 => ["A1:A10", "B5"]
+   */
+  function parseFormulaReferences(formula: string): string[] {
+    if (!formula || !formula.startsWith("=")) return [];
+    
+    const references: string[] = [];
+    // ƥ�䵥Ԫ������: A1, $A$1, Sheet1!A1, 'Sheet Name'!A1:B10
+    const cellRefRegex = /(?:'[^']+'!)?(?:\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?)/gi;
+    let match;
+    while ((match = cellRefRegex.exec(formula)) !== null) {
+      references.push(match[0]);
+    }
+    // ƥ��������Χ (�򻯣���������ĸ��ͷ�ı�ʶ��)
+    const namedRangeRegex = /\b([A-Za-z_][A-Za-z0-9_]*)\b/g;
+    const commonFunctions = new Set([
+      "SUM", "AVERAGE", "COUNT", "MAX", "MIN", "IF", "VLOOKUP", "HLOOKUP",
+      "INDEX", "MATCH", "SUMIF", "COUNTIF", "LEFT", "RIGHT", "MID", "LEN",
+      "TRIM", "UPPER", "LOWER", "CONCATENATE", "TEXT", "VALUE", "DATE",
+      "YEAR", "MONTH", "DAY", "NOW", "TODAY", "ROUND", "ABS", "SQRT"
+    ]);
+    while ((match = namedRangeRegex.exec(formula)) !== null) {
+      if (!commonFunctions.has(match[1].toUpperCase())) {
+        // ������������Χ
+      }
+    }
+    return references;
+  }
+
+  /**
+   * ������ʽ���Ӷ�
+   */
+  function analyzeFormulaComplexity(formula: string): { level: "simple" | "medium" | "complex"; score: number; functions: string[] } {
+    if (!formula || !formula.startsWith("=")) {
+      return { level: "simple", score: 0, functions: [] };
+    }
+
+    // ��ȡ������
+    const functionRegex = /([A-Z]+)\s*\(/gi;
+    const functions: string[] = [];
+    let match;
+    while ((match = functionRegex.exec(formula)) !== null) {
+      functions.push(match[1].toUpperCase());
+    }
+
+    // ����Ƕ������
+    let maxDepth = 0;
+    let currentDepth = 0;
+    for (const char of formula) {
+      if (char === "(") {
+        currentDepth++;
+        maxDepth = Math.max(maxDepth, currentDepth);
+      } else if (char === ")") {
+        currentDepth--;
+      }
+    }
+
+    // ���㸴�Ӷȷ���
+    const score = functions.length * 10 + maxDepth * 15 + (formula.length > 100 ? 20 : 0);
+    
+    let level: "simple" | "medium" | "complex" = "simple";
+    if (score >= 50) level = "complex";
+    else if (score >= 20) level = "medium";
+
+    return { level, score, functions };
+  }
+
+  // ===== ������ȫ��ɨ��ϵͳ (����IDE����Ŀ������) =====
+  
+  /**
+   * ɨ������������������ȫ������������
+   * ������IDE�Թ����������ļ�������
+   */
+  async function scanWorkbook(): Promise<WorkbookContext | null> {
+    if (typeof Excel === "undefined") {
+      return null;
+    }
+
+    setIsScanning(true);
+    setScanProgress(0);
+
+    try {
+      const context = await Excel.run(async (ctx) => {
+        const workbook = ctx.workbook;
+        workbook.load("name");
+        
+        // �������й�����
+        const sheets = workbook.worksheets;
+        sheets.load("items/name, items/position");
+        
+        // ����������Χ
+        const namedItems = workbook.names;
+        namedItems.load("items/name, items/value, items/comment, items/scope");
+        
+        await ctx.sync();
+        setScanProgress(20);
+
+        const sheetInfos: SheetInfo[] = [];
+        const tableInfos: TableInfo[] = [];
+        const chartInfos: ChartInfo[] = [];
+        const pivotTableInfos: PivotTableInfo[] = [];
+        let totalCellsWithData = 0;
+        let totalFormulas = 0;
+        const issues: WorkbookContext["issues"] = [];
+
+        // ��ʽ�����ռ�
+        const formulaDeps: FormulaDependency[] = [];
+        const complexFormulas: Array<{ address: string; formula: string; complexity: string }> = [];
+
+        // ɨ��ÿ��������
+        for (let i = 0; i < sheets.items.length; i++) {
+          const sheet = sheets.items[i];
+          sheet.load("name, position");
+          
+          const usedRange = sheet.getUsedRangeOrNullObject();
+          usedRange.load("address, rowCount, columnCount, values, formulas");
+          
+          const tables = sheet.tables;
+          tables.load("items/name, items/showHeaders, items/style");
+          
+          const charts = sheet.charts;
+          charts.load("items/name, items/chartType, items/title/text");
+          
+          const pivots = sheet.pivotTables;
+          pivots.load("items/name");
+          
+          await ctx.sync();
+          setScanProgress(20 + Math.round((i / sheets.items.length) * 60));
+
+          const hasData = !usedRange.isNullObject;
+          let rowCount = 0;
+          let columnCount = 0;
+          let usedRangeAddress = "";
+          
+          if (hasData) {
+            rowCount = usedRange.rowCount;
+            columnCount = usedRange.columnCount;
+            usedRangeAddress = usedRange.address;
+            totalCellsWithData += rowCount * columnCount;
+            
+            // ͳ�ƹ�ʽ��������������
+            if (usedRange.formulas) {
+              // ��ȡ��ʼ��Ԫ����ַ
+              const addressMatch = usedRange.address.match(/!?([A-Z]+)(\d+)/);
+              const startCol = addressMatch ? addressMatch[1] : "A";
+              const startRow = addressMatch ? parseInt(addressMatch[2], 10) : 1;
+              
+              for (let r = 0; r < usedRange.formulas.length; r++) {
+                const formulaRow = usedRange.formulas[r];
+                for (let c = 0; c < formulaRow.length; c++) {
+                  const cell = formulaRow[c];
+                  if (typeof cell === "string" && cell.startsWith("=")) {
+                    totalFormulas++;
+                    
+                    // ������ʽ���Ӷ� (ֻ����ǰ100����ʽ)
+                    if (formulaDeps.length < 100) {
+                      const cellAddr = `${String.fromCharCode(startCol.charCodeAt(0) + c)}${startRow + r}`;
+                      const refs = parseFormulaReferences(cell);
+                      const complexity = analyzeFormulaComplexity(cell);
+                      
+                      formulaDeps.push({
+                        cellAddress: `${sheet.name}!${cellAddr}`,
+                        formula: cell.length > 100 ? cell.substring(0, 100) + "..." : cell,
+                        dependsOn: refs,
+                        usedBy: [], // �ݲ����㷴������
+                      });
+                      
+                      if (complexity.level === "complex") {
+                        complexFormulas.push({
+                          address: `${sheet.name}!${cellAddr}`,
+                          formula: cell.length > 50 ? cell.substring(0, 50) + "..." : cell,
+                          complexity: `${complexity.functions.join(", ")} (Ƕ�����ȸ�)`,
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          // �ռ���������Ϣ
+          sheetInfos.push({
+            name: sheet.name,
+            index: sheet.position,
+            isActive: i === 0, // ��ʱ������һ���ǻ��
+            usedRangeAddress,
+            rowCount,
+            columnCount,
+            hasData,
+            hasTables: tables.items.length > 0,
+            hasCharts: charts.items.length > 0,
+            hasPivotTables: pivots.items.length > 0,
+          });
+
+          // �ռ�������Ϣ
+          for (const table of tables.items) {
+            const tableRange = table.getRange();
+            tableRange.load("address, rowCount, columnCount");
+            const headerRow = table.getHeaderRowRange();
+            headerRow.load("values");
+            
+            await ctx.sync();
+            
+            tableInfos.push({
+              name: table.name,
+              sheetName: sheet.name,
+              address: tableRange.address,
+              rowCount: tableRange.rowCount,
+              columnCount: tableRange.columnCount,
+              hasHeaders: table.showHeaders,
+              columns: headerRow.values[0]?.map(v => String(v)) || [],
+              style: table.style,
+            });
+          }
+
+          // �ռ�ͼ����Ϣ
+          for (const chart of charts.items) {
+            chartInfos.push({
+              name: chart.name,
+              sheetName: sheet.name,
+              chartType: chart.chartType,
+              title: chart.title?.text,
+            });
+          }
+
+          // �ռ�͸�ӱ���Ϣ
+          for (const pivot of pivots.items) {
+            pivotTableInfos.push({
+              name: pivot.name,
+              sheetName: sheet.name,
+            });
+          }
+        }
+
+        setScanProgress(85);
+
+        // �ռ�������Χ��Ϣ
+        const namedRangeInfos: NamedRangeInfo[] = namedItems.items.map(item => ({
+          name: item.name,
+          address: item.value,
+          scope: item.scope === Excel.NamedItemScope.workbook ? "workbook" : "worksheet",
+          comment: item.comment,
+        }));
+
+        // �������ٲ�������
+        const sheetByName: Record<string, SheetInfo> = {};
+        sheetInfos.forEach(s => { sheetByName[s.name] = s; });
+        
+        const tableByName: Record<string, TableInfo> = {};
+        tableInfos.forEach(t => { tableByName[t.name] = t; });
+
+        // ����Ǳ������
+        for (const sheet of sheetInfos) {
+          if (sheet.rowCount > 10000) {
+            issues.push({
+              type: "warning",
+              message: `������ "${sheet.name}" �������ϴ� (${sheet.rowCount}��)������Ӱ������`,
+              location: sheet.name,
+            });
+          }
+          if (!sheet.hasData) {
+            issues.push({
+              type: "suggestion",
+              message: `������ "${sheet.name}" Ϊ��`,
+              location: sheet.name,
+            });
+          }
+        }
+
+        // ���Ӹ��ӹ�ʽ����
+        for (const cf of complexFormulas) {
+          issues.push({
+            type: "warning",
+            message: `���ӹ�ʽ ${cf.address}: ${cf.complexity}`,
+            location: cf.address,
+          });
+        }
+
+        // ����������������
+        const hasTablesBonus = tableInfos.length > 0 ? 10 : 0;
+        const hasChartsBonus = chartInfos.length > 0 ? 10 : 0;
+        const hasNamesBonus = namedRangeInfos.length > 0 ? 5 : 0;
+        const sheetsOrganizedBonus = sheetInfos.every(s => s.hasData) ? 10 : 0;
+        const formulaComplexityPenalty = complexFormulas.length > 5 ? -5 : 0;
+        const overallQualityScore = Math.min(100, Math.max(0, 65 + hasTablesBonus + hasChartsBonus + hasNamesBonus + sheetsOrganizedBonus + formulaComplexityPenalty));
+
+        setScanProgress(100);
+
+        return {
+          lastScanned: new Date(),
+          fileName: workbook.name || "������",
+          sheets: sheetInfos,
+          namedRanges: namedRangeInfos,
+          tables: tableInfos,
+          charts: chartInfos,
+          pivotTables: pivotTableInfos,
+          totalCellsWithData,
+          totalFormulas,
+          formulaDependencies: formulaDeps, // ��ʽ��������
+          dataRelationships: [], // ���ݹ�ϵ����������չ��
+          sheetByName,
+          tableByName,
+          overallQualityScore,
+          issues,
+        };
+      });
+
+      setWorkbookContext(context);
+      return context;
+
+    } catch (error) {
+      console.error("工作簿扫描失败:", error);
+      return null;
+    } finally {
+      setIsScanning(false);
+      setScanProgress(0);
+    }
+  }
+
+  /**
+   * 验证操作执行结果
+   * �������ɺ����������Ƿ�����Ԥ��
+   */
+  async function verifyOperationResult(
+    operationType: string,
+    targetAddress: string,
+    expectedValue?: unknown
+  ): Promise<OperationVerification> {
+    const verification: OperationVerification = {
+      success: false,
+      operationType,
+      targetAddress,
+      expectedResult: expectedValue,
+      actualResult: undefined,
+      matchesExpectation: false,
+      details: "",
+      timestamp: new Date(),
+    };
+
+    if (typeof Excel === "undefined") {
+      verification.details = "Excel API ������";
+      return verification;
+    }
+
+    try {
+      await Excel.run(async (ctx) => {
+        const sheet = ctx.workbook.worksheets.getActiveWorksheet();
+        
+        // ������ַ��֧�ֿ�����ַ
+        let targetRange: Excel.Range;
+        if (targetAddress.includes("!")) {
+          const [sheetName, addr] = targetAddress.split("!");
+          const targetSheet = ctx.workbook.worksheets.getItem(sheetName.replace(/'/g, ""));
+          targetRange = targetSheet.getRange(addr);
+        } else {
+          targetRange = sheet.getRange(targetAddress);
+        }
+        
+        targetRange.load("values, formulas, numberFormat");
+        await ctx.sync();
+        
+        verification.actualResult = targetRange.values;
+        
+        // ���ݲ���������֤����
+        switch (operationType.toLowerCase()) {
+          case "write_range":
+          case "writerange":
+          case "insert_data": {
+            // ��֤������д��
+            const hasData = targetRange.values.some(row => 
+              row.some(cell => cell !== null && cell !== undefined && cell !== "")
+            );
+            verification.success = hasData;
+            verification.details = hasData ? "�����ѳɹ�д��" : "д������Ԫ��Ϊ��";
+            break;
+          }
+            
+          case "set_formula":
+          case "setformula": {
+            // ��֤��ʽ������
+            const formula = targetRange.formulas[0]?.[0];
+            const hasFormula = typeof formula === "string" && formula.startsWith("=");
+            verification.success = hasFormula;
+            verification.details = hasFormula ? `��ʽ������: ${formula}` : "��ʽδ����";
+            
+            // ���鹫ʽ����
+            const formulaResult = targetRange.values[0]?.[0];
+            if (typeof formulaResult === "string" && formulaResult.startsWith("#")) {
+              verification.success = false;
+              verification.details = `��ʽ����: ${formulaResult}`;
+            }
+            break;
+          }
+            
+          case "clear_range":
+          case "clearrange": {
+            // ��֤������
+            const isEmpty = targetRange.values.every(row =>
+              row.every(cell => cell === null || cell === undefined || cell === "")
+            );
+            verification.success = isEmpty;
+            verification.details = isEmpty ? "����������" : "����δ��ȫ����";
+            break;
+          }
+            
+          default:
+            // Ĭ�ϼ��������Ƿ����쳣
+            verification.success = true;
+            verification.details = "������ִ��";
+        }
+        
+        // ������Ԥ��ֵ�����бȶ�
+        if (expectedValue !== undefined) {
+          const actualFirst = targetRange.values[0]?.[0];
+          verification.matchesExpectation = actualFirst === expectedValue;
+          if (!verification.matchesExpectation) {
+            verification.details += ` (Ԥ��: ${expectedValue}, ʵ��: ${actualFirst})`;
+          }
+        }
+      });
+    } catch (error) {
+      verification.success = false;
+      verification.details = `��֤ʧ��: ${error instanceof Error ? error.message : String(error)}`;
+    }
+
+    return verification;
+  }
+
+  // �Զ�ɨ�蹤�������״μ��غͶ���ˢ�£�
+  React.useEffect(() => {
+    // ����ɨ��
+    void scanWorkbook();
+
+    // ����ˢ�£�ÿ5���ӣ�
+    workbookScanIntervalRef.current = setInterval(() => {
+      void scanWorkbook();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      if (workbookScanIntervalRef.current) {
+        clearInterval(workbookScanIntervalRef.current);
+      }
+    };
+  }, []);
+
+
+  /**
+   * ��������ժҪ
+   */
+  function generateDataSummary(selection: SelectionResult): DataSummary {
+    const values = selection.values;
+    let numericCount = 0;
+    let textCount = 0;
+    let dateCount = 0;
+    let emptyCount = 0;
+    const columnTypes: string[] = [];
+
+    // ����ÿ�е���������
+    for (let col = 0; col < selection.columnCount; col++) {
+      let colNumeric = 0;
+      let _colText = 0;
+      let colDate = 0;
+      let _colEmpty = 0;
+
+      for (let row = 1; row < values.length; row++) { // ������ͷ
+        const cell = values[row]?.[col];
+        if (cell === null || cell === undefined || cell === "") {
+          _colEmpty++;
+          emptyCount++;
+        } else if (typeof cell === "number") {
+          colNumeric++;
+        } else if (typeof cell === "string") {
+          // �����Ƿ������ڸ�ʽ
+          if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(cell)) {
+            colDate++;
+          } else {
+            _colText++;
+          }
+        }
+      }
+
+      // ȷ��������
+      const total = values.length - 1;
+      if (colNumeric / total > 0.5) {
+        columnTypes.push("numeric");
+        numericCount++;
+      } else if (colDate / total > 0.3) {
+        columnTypes.push("date");
+        dateCount++;
+      } else {
+        columnTypes.push("text");
+        textCount++;
+      }
+    }
+
+    // �����Ƿ��б�ͷ
+    const firstRow = values[0];
+    const hasHeaders = firstRow?.every(cell => typeof cell === "string" && cell.length > 0) ?? false;
+
+    // ������������
+    const totalCells = selection.rowCount * selection.columnCount;
+    const qualityScore = Math.round((1 - emptyCount / totalCells) * 100);
+
+    return {
+      rowCount: selection.rowCount,
+      columnCount: selection.columnCount,
+      dataTypes: columnTypes,
+      hasHeaders,
+      numericColumns: numericCount,
+      textColumns: textCount,
+      dateColumns: dateCount,
+      emptyCount,
+      qualityScore,
+    };
+  }
+
+  /**
+   * ������������������������
+   */
+  function generateProactiveSuggestions(
+    selection: SelectionResult,
+    summary: DataSummary
+  ): ProactiveSuggestion[] {
+    const suggestions: ProactiveSuggestion[] = [];
+
+    // 1. ��������ֵ�У�����ͳ�Ʒ���
+    if (summary.numericColumns > 0) {
+      suggestions.push({
+        id: uid(),
+        icon: "analyze",
+        title: "ͳ�Ʒ���",
+        description: `���� ${summary.numericColumns} ����ֵ�е�ͳ������`,
+        action: async () => {
+          await onSend("������Щ���ݵ�ͳ��������������ֵ����λ����������Сֵ");
+        },
+        confidence: 0.9,
+      });
+    }
+
+    // 2. �����ж�����ֵ�У����鴴��ͼ��
+    if (summary.numericColumns >= 1 && summary.rowCount >= 3) {
+      const chartType = summary.dateColumns > 0 ? "����ͼ" : "��״ͼ";
+      suggestions.push({
+        id: uid(),
+        icon: "chart",
+        title: `����${chartType}`,
+        description: `�����ݿ��ӻ�Ϊ${chartType}`,
+        action: async () => {
+          await onSend(`Ϊ��Щ���ݴ���һ��${chartType}`);
+        },
+        confidence: 0.85,
+      });
+    }
+
+    // 3. �����п�ֵ��������������
+    if (summary.emptyCount > 0) {
+      const emptyPercent = ((summary.emptyCount / (summary.rowCount * summary.columnCount)) * 100).toFixed(1);
+      suggestions.push({
+        id: uid(),
+        icon: "clean",
+        title: "��������",
+        description: `���� ${summary.emptyCount} ����ֵ (${emptyPercent}%)`,
+        action: async () => {
+          await onSend("����������Щ�����еĿ�ֵ");
+        },
+        confidence: 0.8,
+      });
+    }
+
+    // 4. �����������ϴ󣬽�������/����
+    if (summary.rowCount > 5 && summary.numericColumns > 0) {
+      suggestions.push({
+        id: uid(),
+        icon: "formula",
+        title: "���ӻ���",
+        description: "Ϊ��ֵ����������/ƽ��ֵ��ʽ",
+        action: async () => {
+          await onSend("�������·��������͹�ʽ");
+        },
+        confidence: 0.75,
+      });
+    }
+
+    // 5. ���������������ߣ�������ʽ��
+    if (summary.qualityScore < 90 || summary.rowCount > 10) {
+      suggestions.push({
+        id: uid(),
+        icon: "format",
+        title: "��ʽ����",
+        description: "�Ż�������ʽ����ʽ",
+        action: async () => {
+          await onSend("�������������ĸ�ʽ�����ӱ߿�����ɫ");
+        },
+        confidence: 0.7,
+      });
+    }
+
+    // �����Ŷ����������෵��4������
+    return suggestions.sort((a, b) => b.confidence - a.confidence).slice(0, 4);
+  }
+
+  function getActionLabel(action: CopilotAction): string {
+    switch (action.type) {
+      case "executeCommand":
+        return action.label;
+      case "writeRange":
+      case "setFormula":
+      case "writeCell":
+        return action.address;
+      default:
+        // ȷ��������������
+        return "δ֪����";
+    }
+  }
+
+  /**
+   * �жϲ����Ƿ���Ҫȷ�ϣ��߷��ղ�����
+   */
+  function isHighRiskAction(action: CopilotAction): boolean {
+    if (action.type === "executeCommand") {
+      const cmd = action.command;
+      // �߷��ղ�����������ɾ������ʽ������Χ��
+      const highRiskActions = ["clear", "delete", "format"];
+      if (highRiskActions.some((risk) => cmd.action?.toLowerCase().includes(risk))) {
+        return true;
+      }
+      // �漰����Χ����д��
+      if (cmd.type === "write" && cmd.parameters?.values) {
+        const values = cmd.parameters.values;
+        if (Array.isArray(values) && values.length > 50) {
+          return true;
+        }
+      }
+    }
+    if (action.type === "writeRange") {
+      if (action.values.length > 50) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * ���ɲ���Ԥ������
+   */
+  function generatePreviewDescription(actions: CopilotAction[]): string {
+    const descriptions = actions.map((action) => {
+      const label = getActionLabel(action);
+      const risk = isHighRiskAction(action) ? " ??" : "";
+      
+      if (action.type === "writeRange") {
+        return `?? д�����ݵ� ${action.address}��${action.values.length}�� �� ${action.values[0]?.length || 0}�У�${risk}`;
+      }
+      if (action.type === "setFormula") {
+        return `?? ���ù�ʽ ${action.formula} �� ${action.address}`;
+      }
+      if (action.type === "writeCell") {
+        return `?? д�� "${action.value}" �� ${action.address}`;
+      }
+      if (action.type === "executeCommand") {
+        const cmd = action.command;
+        return `?? ִ�� ${cmd.type}/${cmd.action}: ${label}${risk}`;
+      }
+      return `? ${label}${risk}`;
+    });
+
+    return descriptions.join("\n");
+  }
+
+  /**
+   * ��������ǰ��״̬���ڳ���
+   */
+  async function saveStateForUndo(
+    operation: string,
+    rangeAddress?: string
+  ): Promise<UndoStackItem | null> {
+    if (typeof Excel === "undefined") {
+      return null;
+    }
+
+    try {
+      return await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet();
+        sheet.load("name");
+        
+        // ����û��ָ����Χ����ȡ��ʹ�÷�Χ
+        let targetRange: Excel.Range;
+        if (rangeAddress) {
+          targetRange = sheet.getRange(rangeAddress);
+        } else {
+          targetRange = sheet.getUsedRange();
+        }
+        
+        targetRange.load("address,values,formulas");
+        await context.sync();
+
+        const undoItem: UndoStackItem = {
+          id: uid(),
+          operation,
+          timestamp: new Date(),
+          sheetName: sheet.name,
+          rangeAddress: targetRange.address,
+          previousValues: targetRange.values as CellValue[][],
+          previousFormulas: targetRange.formulas as string[][],
+        };
+
+        return undoItem;
+      });
+    } catch (error) {
+      console.warn("�޷����泷��״̬:", error);
+      return null;
+    }
+  }
+
+  /**
+   * 执行撤销操作
+   */
+  async function performUndo(): Promise<boolean> {
+    if (undoStack.length === 0) {
+      dispatchToast(<Text>没有可撤销的操作</Text>, { intent: "warning" });
+      return false;
+    }
+
+    const lastUndo = undoStack[undoStack.length - 1];
+    
+    try {
+      await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(lastUndo.sheetName);
+        const range = sheet.getRange(lastUndo.rangeAddress);
+        
+        // 优先恢复公式（若有），否则恢复值
+        if (lastUndo.previousFormulas) {
+          range.formulas = lastUndo.previousFormulas;
+        } else {
+          range.values = lastUndo.previousValues;
+        }
+        
+        await context.sync();
+      });
+
+      // 从栈中移除已撤销的操作
+      setUndoStack((prev) => prev.slice(0, -1));
+      
+      dispatchToast(<Text>已撤销: {lastUndo.operation}</Text>, { intent: "success" });
+      
+      addToHistory({
+        id: uid(),
+        operation: "撤销",
+        timestamp: new Date(),
+        success: true,
+        details: `撤销了 ${lastUndo.operation}`,
+      });
+
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      dispatchToast(<Text>撤销失败: {message}</Text>, { intent: "error" });
+      return false;
+    }
+  }
+
+  /**
+   * ���ӵ�����ջ
+   */
+  function addToUndoStack(item: UndoStackItem) {
+    setUndoStack((prev) => {
+      const newStack = [...prev, item];
+      // ����ջ��С
+      if (newStack.length > MAX_UNDO_STACK) {
+        return newStack.slice(-MAX_UNDO_STACK);
+      }
+      return newStack;
+    });
+  }
+
+  /**
+   * ��������ȷ��
+   */
+  async function requestOperationConfirmation(
+    actions: CopilotAction[],
+    message: string
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      setPendingActions(actions);
+      setPreviewMessage(message);
+      setPreviewDialogOpen(true);
+      
+      // ʹ��һ�����صĻص�����
+      const handler = (confirmed: boolean) => {
+        setPreviewDialogOpen(false);
+        setPendingActions([]);
+        setPreviewMessage("");
+        resolve(confirmed);
+      };
+      
+      // �洢�ص��Թ��Ի���ʹ��
+      (window as unknown as Record<string, unknown>)._confirmHandler = handler;
+    });
+  }
+
+  // v2.9.9: applyActionsAutomatically 和 attemptErrorRecovery 已删除
+  // 所有 Excel 操作现在通过 Agent 工具层执行 (src/agent/ExcelAdapter.ts)
+
+  // ===== ReAct Agent 核心系统 =====
+  // Agent-First 架构: Agent 核心已迁移到 src/agent/ 模块
+  // 这里只保留 UI 相关的辅助函数
+  
+  /**
+   * 添加 Agent 思维记录（UI 展示用）
+   */
+  function addAgentThought(type: AgentThought["type"], content: string) {
+    const thought: AgentThought = {
+      id: uid(),
+      type,
+      content,
+      timestamp: new Date(),
+    };
+    setAgentThoughts(prev => [...prev, thought]);
+    return thought;
+  }
+  
+  /**
+   * 实时更新 Agent 消息（流式显示思考过程）
+   */
+  function updateAgentMessage(step: string) {
+    const msgId = currentAgentMsgIdRef.current;
+    if (!msgId) return;
+    
+    // 添加新步骤到历史
+    agentStepsRef.current.push(step);
+    
+    // 构建实时显示的消息内容
+    const stepsText = agentStepsRef.current.join("\n");
+    
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId
+          ? { ...msg, text: stepsText }
+          : msg
+      )
+    );
+  }
+
+  // ===== 已删除旧的独立 Agent 函数（已迁移到 src/agent/ 模块）=====
+  // buildAgentSystemPrompt, agentThink, agentExecuteTool, runReActAgent, runAgentLoop, getCurrentSelection
+  // v2.9.8: 现在通过 useAgent hook 使用新的 Agent 模块
+
+  // v2.9.8: 后端/API密钥管理函数现在使用 useApiSettings hook
+  async function bootstrapBackendStatus(): Promise<void> {
+    await apiSettings.bootstrap();
+  }
+
+  async function refreshBackendStatus(showToast: boolean = false): Promise<boolean> {
+    const ok = await apiSettings.refreshBackendStatus(showToast);
+    if (showToast && ok) {
+      dispatchToast(<Text>后端服务已连接</Text>, { intent: "success" });
+    } else if (showToast && !ok) {
+      dispatchToast(<Text>后端服务不可用，请检查服务是否启动</Text>, { intent: "error" });
+    }
+    return ok;
+  }
+
+  async function checkApiKeyStatus(): Promise<ApiKeyStatus | null> {
+    return await apiSettings.checkApiKeyStatus();
+  }
+
+  async function handleSetApiKey(): Promise<void> {
+    if (!apiKeyInput.trim() || apiKeyBusy) return;
+
+    const result = await apiSettings.setApiKey(apiKeyInput.trim());
+
+    if (result.success) {
+      dispatchToast(<Text>✓ API密钥设置成功</Text>, { intent: "success" });
+      setApiKeyDialogOpen(false);
+      setApiKeyInput("");
+    } else {
+      dispatchToast(<Text>✗ {result.message || "API密钥设置失败"}</Text>, { intent: "error" });
+    }
+  }
+
+  async function handleClearApiKey(): Promise<void> {
+    const result = await apiSettings.clearApiKey();
+    if (result.success) {
+      dispatchToast(<Text>✓ API密钥已清除</Text>, { intent: "success" });
+    }
+  }
+
+  /**
+   * 统一入口 - 所有请求都走 Agent 模式
+   * v2.9.9: 删除 shouldUseAgentMode，Agent 自己判断是否需要工具
+   * 
+   * 原理：
+   * - 用户说"你好" → Agent 判断不需要工具，直接回复
+   * - 用户说"帮我建表" → Agent 调用工具执行
+   * - 和 GitHub Copilot 的工作方式一致
+   */
+  async function onSend(text: string): Promise<void> {
+    const t = text.trim();
+    if (!t || busy) return;
+
+    const userMessage: ChatMessage = {
+      id: uid(),
+      role: "user",
+      text: t,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setBusy(true);
+
+    try {
+      const backendOk = backendHealthy === true ? true : await refreshBackendStatus(false);
+      if (!backendOk) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "assistant",
+            text: "后端不可用，无法处理请求。请确保后端服务已启动后重试。",
+            timestamp: new Date(),
+          },
+        ]);
+        setBusy(false);
+        return;
+      }
+
+      let status = apiKeyStatus;
+      if (!status) {
+        status = await checkApiKeyStatus();
+      }
+
+      if (!status?.configured || !status?.isValid) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "assistant",
+            text: "⚠️ 请先配置有效的 API 密钥以使用 AI 功能。点击右上角的⚙️设置按钮。",
+            timestamp: new Date(),
+          },
+        ]);
+        setBusy(false);
+        return;
+      }
+
+      // ===== 统一 Agent 模式：所有请求都走这里 =====
+      console.log("[App] 使用统一 Agent 模式处理请求");
+      
+      // 显示更自然的思考状态
+        const thinkingMsgId = uid();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: thinkingMsgId,
+            role: "assistant",
+            text: "🤔 让我来分析这个任务...",
+            timestamp: new Date(),
+          },
+        ]);
+
+        // 使用新的 Agent 模块执行任务
+        setIsAgentRunning(true);
+        setAgentThoughts([]);
+        
+        // 设置实时消息更新的 ref
+        currentAgentMsgIdRef.current = thinkingMsgId;
+        agentStepsRef.current = ["🤔 让我来分析这个任务..."];
+        
+        // 设置实时更新函数
+        updateAgentMessageRef.current = (step: string) => {
+          agentStepsRef.current.push(step);
+          const stepsText = agentStepsRef.current.join("\n");
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === thinkingMsgId
+                ? { ...msg, text: stepsText }
+                : msg
+            )
+          );
+        };
+        
+        // v2.9.8: 设置 useAgent hook 的步骤回调
+        agent.setStepCallback(updateAgentMessageRef.current);
+        
+        const agentInstance = agent.agentInstance;
+        if (!agentInstance) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === thinkingMsgId
+                ? { ...msg, text: "抱歉，我暂时无法处理这个任务。请刷新页面后重试。" }
+                : msg
+            )
+          );
+          setBusy(false);
+          setIsAgentRunning(false);
+          return;
+        }
+        
+        try {
+          // 构建环境状态（包括工作簿上下文）
+          const environmentState: Record<string, unknown> = {
+            environment: "excel",
+            timestamp: new Date().toISOString(),
+          };
+          
+          // 添加工作簿上下文（如果已扫描）
+          if (workbookContext) {
+            environmentState.workbook = {
+              fileName: workbookContext.fileName,
+              sheets: workbookContext.sheets.map(s => ({
+                name: s.name,
+                usedRangeAddress: s.usedRangeAddress,
+                rowCount: s.rowCount,
+                columnCount: s.columnCount,
+                hasData: s.rowCount > 0 && s.columnCount > 0,
+              })),
+              tables: workbookContext.tables.map(t => ({
+                name: t.name,
+                sheetName: t.sheetName,
+                address: t.address,
+                rowCount: t.rowCount,
+                columns: t.columns,
+              })),
+              charts: workbookContext.charts.map(c => ({
+                name: c.name,
+                sheetName: c.sheetName,
+                type: c.chartType,
+              })),
+              namedRanges: workbookContext.namedRanges.map(n => ({
+                name: n.name,
+                address: n.address,
+              })),
+              totalCellsWithData: workbookContext.totalCellsWithData,
+              totalFormulas: workbookContext.totalFormulas,
+              qualityScore: workbookContext.overallQualityScore,
+              lastScanned: workbookContext.lastScanned.toISOString(),
+            };
+          }
+          
+          // v2.9.8: 使用 agentInstance 替代 agent（变量名冲突）
+          const agentTask: AgentTask = await agentInstance.run(t, {
+            environment: "excel",
+            environmentState,
+          });
+          
+          // 从 Agent 结果中构建用户消息
+          const agentResult = {
+            success: agentTask.status === "completed",
+            message: agentTask.result || "任务完成",
+            steps: agentTask.steps,
+            thoughts: [] as AgentThought[], // 思维链通过事件收集
+          };
+        
+        // 构建更自然的响应消息
+        let mainMessage = agentResult.message;
+        
+        // 如果消息太技术化，尝试转换为更自然的文本
+        if (mainMessage.includes("已完成") || mainMessage.includes("完成")) {
+          // 消息已经足够自然
+        } else if (mainMessage.includes("执行") && mainMessage.includes("成功")) {
+          mainMessage = mainMessage.replace(/执行.*成功[。！]?/, "已完成！");
+        }
+        
+        // 构建步骤摘要（更简洁）
+        let stepsText = "";
+        const execSteps = agentResult.steps.filter(s => s.type === "act");
+        const observeSteps = agentResult.steps.filter(s => s.type === "observe" && s.observation && !s.observation.startsWith("错误"));
+        
+        if (execSteps.length > 0 && observeSteps.length > 0) {
+          // 只显示关键操作，不显示太细节
+          const actionSummary = execSteps.map(step => {
+            const toolName = step.toolName || "";
+            // 转换工具名为用户友好的描述
+            if (toolName.includes("write_range")) return "写入数据";
+            if (toolName.includes("formula")) return "应用公式";
+            if (toolName.includes("format")) return "格式化";
+            if (toolName.includes("chart")) return "创建图表";
+            if (toolName.includes("analyze")) return "分析数据";
+            if (toolName.includes("conditional")) return "条件格式";
+            if (toolName.includes("auto_fit")) return "调整列宽";
+            if (toolName.includes("read")) return "读取数据";
+            if (toolName.includes("create_sheet")) return "创建工作表";
+            if (toolName.includes("validation")) return "数据验证";
+            return toolName.replace("excel_", "").replace(/_/g, " ");
+          }).filter((v, i, a) => a.indexOf(v) === i); // 去重
+          
+          if (actionSummary.length > 0) {
+            stepsText = "\n\n**已完成操作：**\n• " + actionSummary.join("\n• ");
+          }
+        }
+        
+        // 构建思维链展示（展示 Agent 的思考过程）
+        let thoughtsText = "";
+        const thinkSteps = agentResult.steps.filter(s => s.type === "think" && s.thought);
+        if (thinkSteps.length > 0) {
+          thoughtsText = "\n\n**思考过程：**\n";
+          thinkSteps.forEach((step, idx) => {
+            thoughtsText += `${idx + 1}. ${step.thought}\n`;
+          });
+        }
+        
+        // 构建最终消息（保留实时步骤 + 添加完成摘要）
+        const existingSteps = agentStepsRef.current.join("\n");
+        const completionSuffix = agentResult.success 
+          ? `\n\n✅ **任务完成！**${stepsText}` 
+          : `\n\n⚠️ **任务部分完成**${stepsText}`;
+        
+        // 更新消息
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === thinkingMsgId
+              ? {
+                  ...msg,
+                  text: existingSteps + completionSuffix,
+                }
+              : msg
+          )
+        );
+        
+        if (agentResult.success) {
+          dispatchToast(<Text>Agent 任务执行完成</Text>, { intent: "success" });
+        } else {
+          dispatchToast(<Text>Agent 任务部分完成</Text>, { intent: "warning" });
+        }
+        
+        } catch (agentError) {
+          // Agent 执行出错
+          const existingSteps = agentStepsRef.current.join("\n");
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === thinkingMsgId
+                ? { ...msg, text: `${existingSteps}\n\n❌ **Agent 执行失败**: ${agentError instanceof Error ? agentError.message : String(agentError)}` }
+                : msg
+            )
+          );
+          dispatchToast(<Text>Agent 任务失败</Text>, { intent: "error" });
+        } finally {
+          setIsAgentRunning(false);
+          // 清理 ref
+          currentAgentMsgIdRef.current = null;
+          updateAgentMessageRef.current = null;
+          setBusy(false);
+        }
+    } catch (e: unknown) {
+      const result = await errorHandler.handleError(
+        e,
+        { operation: "send_message", parameters: { text: t } },
+        { showToUser: true, userFriendlyMessage: "������Ϣʱ��������" }
+      );
+
+      const messageText = result.userMessage || (e instanceof Error ? e.message : String(e));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          text: `? ${messageText}`,
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // v2.9.9: onApply 重构为通过 Agent 执行操作
+  // UI 不再直接调用 Excel API，所有操作通过 Agent 工具层执行
+  async function onApply(action: CopilotAction): Promise<void> {
+    setBusy(true);
+    try {
+      const actionLabel = getActionLabel(action);
+      
+      // 构建自然语言请求让 Agent 执行
+      let requestText = "";
+      if (action.type === "executeCommand" && action.command) {
+        const cmd = action.command;
+        const params = JSON.stringify(cmd.parameters || {});
+        requestText = `请执行以下 Excel 操作: ${cmd.action || cmd.type}，参数: ${params}`;
+      } else if (action.type === "writeRange" || action.type === "setFormula" || action.type === "writeCell") {
+        requestText = `请执行操作: ${action.type}，地址: ${action.address || "当前选区"}`;
+      } else {
+        requestText = `请执行操作: ${actionLabel}`;
+      }
+      
+      // 通过 onSend 调用 Agent 来执行操作
+      await onSend(requestText);
+      
+      addToHistory({
+        id: uid(),
+        operation: `应用${action.type}`,
+        timestamp: new Date(),
+        success: true,
+        details: actionLabel,
+      });
+    } catch (e: unknown) {
+      const result = await errorHandler.handleError(
+        e,
+        { operation: "apply_action" },
+        { showToUser: true, userFriendlyMessage: "应用操作失败" }
+      );
+
+      const messageText = result.userMessage || (e instanceof Error ? e.message : String(e));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "assistant",
+          text: `❌ ${messageText}`,
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function addToHistory(item: OperationHistoryItem): void {
+    setHistory((prev) => [item, ...prev].slice(0, 50));
+    setHistoryIndex(-1);
+  }
+
+  // �ж��Ƿ���ʾ��ӭ���棨����Ϣʱ��
+  const showWelcome = messages.length === 0;
+  const isDisabled = busy || backendHealthy === false;
+
+  // v2.9.8: 构建 HeaderBar 需要的 workbookSummary
+  const workbookSummary = workbookContext ? {
+    sheetCount: workbookContext.sheets.length,
+    tableCount: workbookContext.tables.length,
+    formulaCount: workbookContext.totalFormulas,
+    qualityScore: workbookContext.overallQualityScore,
+  } : undefined;
+
+  // v2.9.8: 构建 InsightPanel 需要的数据
+  const insightDataSummary: InsightDataSummary | undefined = dataSummary ? {
+    rowCount: dataSummary.rowCount,
+    columnCount: dataSummary.columnCount,
+    numericColumns: dataSummary.numericColumns,
+    qualityScore: dataSummary.qualityScore,
+  } : undefined;
+
+  const insightSuggestions: InsightSuggestion[] = proactiveSuggestions.map(s => ({
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    icon: s.icon as InsightSuggestion["icon"],
+    action: () => void s.action(),
+  }));
+
+  return (
+    <FluentProvider theme={isDarkTheme ? webDarkTheme : webLightTheme} className={styles.app}>
+      <Toaster toasterId={toasterId} />
+      
+      <div className={styles.container}>
+        {/* ===== 顶部状态栏 ===== */}
+        <HeaderBar
+          backendHealthy={backendHealthy}
+          workbookSummary={workbookSummary}
+          isScanning={isScanning}
+          scanProgress={scanProgress}
+          selectionAddress={lastSelection?.address}
+          undoCount={undoStack.length}
+          apiKeyValid={apiKeyStatus?.isValid ?? false}
+          onRefreshWorkbook={() => void scanWorkbook()}
+          onUndo={() => void performUndo()}
+          onOpenSettings={() => setApiKeyDialogOpen(true)}
+        />
+
+        {/* ===== 进度条 ===== */}
+        {(analysisProgress > 0 || isScanning) && (
+          <div className={styles.progressWrapper}>
+            <ProgressBar value={isScanning ? scanProgress / 100 : analysisProgress / 100} />
+          </div>
+        )}
+
+        {/* ===== 数据洞察面板 ===== */}
+        {(dataSummary || isAnalyzing) && (
+          <InsightPanel
+            isAnalyzing={isAnalyzing}
+            dataSummary={insightDataSummary}
+            selectionAddress={lastSelection?.address}
+            suggestions={insightSuggestions}
+          />
+        )}
+
+        {/* ===== 聊天区域 ===== */}
+        <div className={styles.chatContainer}>
+          {showWelcome ? (
+            <WelcomeView disabled={isDisabled} onSend={onSend} />
+          ) : (
+            <MessageList
+              messages={messages}
+              busy={busy}
+              isAgentRunning={isAgentRunning}
+              onApply={onApply}
+            />
+          )}
+        </div>
+
+        {/* ===== 输入区域 ===== */}
+        <ChatInputArea
+          value={input}
+          onChange={setInput}
+          onSend={onSend}
+          busy={busy}
+          backendHealthy={backendHealthy}
+        />
+      </div>
+
+      {/* ===== API 配置对话框 ===== */}
+      <ApiConfigDialog
+        open={apiKeyDialogOpen}
+        onOpenChange={setApiKeyDialogOpen}
+        apiKeyInput={apiKeyInput}
+        onApiKeyInputChange={setApiKeyInput}
+        apiKeyStatus={apiKeyStatus}
+        backendHealthy={backendHealthy}
+        backendChecking={backendChecking}
+        apiKeyBusy={apiKeyBusy}
+        onRefreshBackend={() => void refreshBackendStatus(true)}
+        onSaveApiKey={handleSetApiKey}
+        onClearApiKey={handleClearApiKey}
+      />
+
+      {/* ===== 预览确认对话框 ===== */}
+      <PreviewConfirmDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        previewMessage={previewMessage}
+        onConfirm={() => {
+          const handler = (window as unknown as Record<string, unknown>)._confirmHandler as ((v: boolean) => void) | undefined;
+          if (handler) {
+            handler(true);
+            delete (window as unknown as Record<string, unknown>)._confirmHandler;
+          }
+        }}
+        onCancel={() => {
+          const handler = (window as unknown as Record<string, unknown>)._confirmHandler as ((v: boolean) => void) | undefined;
+          if (handler) {
+            handler(false);
+            delete (window as unknown as Record<string, unknown>)._confirmHandler;
+          }
+        }}
+      />
+    </FluentProvider>
+  );
+};
+
+export default App;

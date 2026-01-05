@@ -1,0 +1,43 @@
+{
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript"
+  ],
+
+  // ===== 性能优化：减少 VS Code 文件监视和索引负载 =====
+  
+  // 排除大目录的文件监视（减少 CPU 和内存占用）
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/backups/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/lib/**": true
+  },
+
+  // 排除搜索范围
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/backups": true,
+    "**/lib": true,
+    "**/*.map": true
+  },
+
+  // 排除文件浏览器显示
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/backups": true
+  },
+
+  // TypeScript 优化：减少不必要的检查
+  "typescript.tsserver.maxTsServerMemory": 2048,
+  "typescript.disableAutomaticTypeAcquisition": true,
+
+  // 终端优化：限制滚动缓冲区减少内存
+  "terminal.integrated.scrollback": 1000
+}

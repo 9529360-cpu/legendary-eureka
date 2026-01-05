@@ -1,0 +1,44 @@
+﻿# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.js.map
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE settings (optional - keep if you want to share VS Code settings)
+# .vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Office Add-in specific
+*.pfx
+*.cer
+
+# Reports (generated, can be large)
+tests/agent/reports/traces/
+tests/agent/reports/*.md
+
+# SSL certificates (generated)
+certs/
