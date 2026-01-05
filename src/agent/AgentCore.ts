@@ -135,6 +135,22 @@ import {
   createSimpleWorkflow,
 } from "./workflow";
 
+// ========== 常量（从 constants 模块导入） ==========
+import {
+  FRIENDLY_ERROR_MAP,
+  EXPERT_AGENTS,
+  RETRY_STRATEGIES,
+  SELF_HEALING_ACTIONS,
+  DEFAULT_INTERACTION_CONFIG,
+  MEMORY_STORAGE_KEY,
+  USER_PROFILE_STORAGE_KEY,
+  WORKBOOK_CACHE_STORAGE_KEY,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_TIMEOUT,
+  DEFAULT_WORKBOOK_CACHE_TTL,
+} from "./constants";
+import type { ExpertAgentType } from "./constants";
+
 // ========== v2.9.47: 类型化工作流事件系统 (借鉴 LlamaIndex Workflows) ==========
 // 注意: 工作流实现已迁移到 src/agent/workflow/ 目录
 // 此处保留注释以说明历史，实际实现从 workflow 模块导入
@@ -833,81 +849,7 @@ export interface ConfirmationConfig {
   reversible: boolean;
 }
 
-/**
- * v2.9.20: 错误代码映射
- */
-export const FRIENDLY_ERROR_MAP: Record<string, Omit<FriendlyError, "code" | "originalMessage">> = {
-  RangeNotFound: {
-    friendlyMessage: "找不到指定的单元格范围",
-    possibleCauses: ["范围地址格式错误", "工作表名称不正确", "指定的单元格不存在"],
-    suggestions: ["检查范围地址是否正确（如 A1:B10）", "确认工作表名称无误"],
-    autoRecoverable: false,
-    severity: "error",
-  },
-  InvalidFormula: {
-    friendlyMessage: "公式有误",
-    possibleCauses: ["函数名拼写错误", "参数数量不对", "引用的单元格不存在"],
-    suggestions: ["检查函数名称拼写", "确认参数格式正确", "验证引用的单元格存在"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-  PermissionDenied: {
-    friendlyMessage: "没有权限执行此操作",
-    possibleCauses: ["工作表已保护", "工作簿已锁定", "单元格被锁定"],
-    suggestions: ["先解除工作表保护", "检查单元格是否被锁定"],
-    autoRecoverable: false,
-    severity: "error",
-  },
-  "#NAME?": {
-    friendlyMessage: "公式中的函数名无法识别",
-    possibleCauses: ["函数名拼写错误", "使用了当前 Excel 版本不支持的函数"],
-    suggestions: ["检查函数名称拼写", "尝试使用兼容的替代函数"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-  "#REF!": {
-    friendlyMessage: "公式引用了无效的单元格",
-    possibleCauses: ["引用的单元格已被删除", "公式复制时引用超出范围"],
-    suggestions: ["检查并修正单元格引用", "使用绝对引用（$A$1）"],
-    autoRecoverable: false,
-    severity: "error",
-  },
-  "#VALUE!": {
-    friendlyMessage: "公式中的值类型不正确",
-    possibleCauses: ["文本与数字混用", "参数类型不匹配"],
-    suggestions: ["确保参与计算的都是数字", "使用 VALUE() 函数转换文本"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-  "#DIV/0!": {
-    friendlyMessage: "公式尝试除以零",
-    possibleCauses: ["除数为零或空单元格"],
-    suggestions: ["添加 IF 判断避免除零", "使用 IFERROR 处理错误"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-  "#N/A": {
-    friendlyMessage: "查找函数找不到匹配项",
-    possibleCauses: ["查找值不存在", "查找范围不正确"],
-    suggestions: ["确认查找值存在于数据中", "检查查找范围是否正确"],
-    autoRecoverable: false,
-    severity: "info",
-  },
-  Timeout: {
-    friendlyMessage: "操作超时",
-    possibleCauses: ["数据量太大", "网络连接问题", "Excel 响应慢"],
-    suggestions: ["尝试减少数据量", "稍后重试", "检查 Excel 是否正常运行"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-  NetworkError: {
-    friendlyMessage: "网络连接出现问题",
-    possibleCauses: ["网络不稳定", "服务器暂时不可用"],
-    suggestions: ["检查网络连接", "稍后重试"],
-    autoRecoverable: true,
-    severity: "warning",
-  },
-};
+// 注意: FRIENDLY_ERROR_MAP 已迁移到 src/agent/constants/index.ts
 
 // ========== Phase 5: 高级特性类型定义 (v2.9.21) ==========
 
@@ -1097,51 +1039,7 @@ export interface LearnedPattern {
   lastUpdated: Date;
 }
 
-/**
- * v2.9.21: 专家 Agent 预定义配置
- */
-export const EXPERT_AGENTS: Record<ExpertAgentType, ExpertAgentConfig> = {
-  data_analyst: {
-    type: "data_analyst",
-    name: "数据分析专家",
-    description: "擅长数据分析、统计和洞察发现",
-    specialties: ["数据分析", "统计", "趋势识别", "异常检测"],
-    tools: ["sample_rows", "excel_read_range", "analyze_data"],
-    systemPromptAddition: "你是数据分析专家，专注于发现数据中的模式和洞察。",
-  },
-  formatter: {
-    type: "formatter",
-    name: "格式化专家",
-    description: "擅长表格格式化和视觉美化",
-    specialties: ["格式化", "样式", "条件格式", "表格美化"],
-    tools: ["excel_format_range", "set_conditional_format", "auto_fit_columns"],
-    systemPromptAddition: "你是格式化专家，专注于让表格更美观易读。",
-  },
-  formula_expert: {
-    type: "formula_expert",
-    name: "公式专家",
-    description: "擅长复杂公式和函数设计",
-    specialties: ["公式", "函数", "计算逻辑", "数组公式"],
-    tools: ["excel_set_formula", "validate_formula", "suggest_formula"],
-    systemPromptAddition: "你是公式专家，专注于设计高效准确的计算公式。",
-  },
-  chart_expert: {
-    type: "chart_expert",
-    name: "图表专家",
-    description: "擅长数据可视化和图表设计",
-    specialties: ["图表", "可视化", "数据展示", "仪表盘"],
-    tools: ["excel_create_chart", "modify_chart", "add_trendline"],
-    systemPromptAddition: "你是图表专家，专注于用合适的图表展示数据。",
-  },
-  general: {
-    type: "general",
-    name: "通用助手",
-    description: "处理一般性任务",
-    specialties: ["通用"],
-    tools: [],
-    systemPromptAddition: "",
-  },
-};
+// 注意: EXPERT_AGENTS 已迁移到 src/agent/constants/index.ts
 
 // ==================== v2.9.22: Phase 6 类型定义 ====================
 
@@ -1315,73 +1213,7 @@ export interface SemanticMemoryEntry {
   accessCount: number;
 }
 
-/**
- * v2.9.22: 预定义重试策略
- */
-export const RETRY_STRATEGIES: Record<string, RetryStrategy> = {
-  default: {
-    id: "default",
-    maxRetries: 3,
-    backoffType: "exponential",
-    initialDelayMs: 1000,
-    maxDelayMs: 10000,
-    retryableErrors: ["timeout", "network", "rate_limit"],
-  },
-  aggressive: {
-    id: "aggressive",
-    maxRetries: 5,
-    backoffType: "linear",
-    initialDelayMs: 500,
-    maxDelayMs: 5000,
-    retryableErrors: ["timeout", "network", "rate_limit", "api_error"],
-    transformBeforeRetry: "simplify",
-  },
-  conservative: {
-    id: "conservative",
-    maxRetries: 2,
-    backoffType: "fixed",
-    initialDelayMs: 2000,
-    maxDelayMs: 2000,
-    retryableErrors: ["timeout", "network"],
-  },
-};
-
-/**
- * v2.9.22: 预定义自愈动作
- */
-export const SELF_HEALING_ACTIONS: SelfHealingAction[] = [
-  {
-    id: "retry_on_timeout",
-    triggerCondition: "timeout",
-    healingAction: "retry",
-    successRate: 70,
-  },
-  {
-    id: "rollback_on_data_corruption",
-    triggerCondition: "data_corruption",
-    healingAction: "rollback",
-    successRate: 90,
-  },
-  {
-    id: "skip_optional_step",
-    triggerCondition: "non_critical_failure",
-    healingAction: "skip",
-    successRate: 85,
-  },
-  {
-    id: "use_alternative_tool",
-    triggerCondition: "tool_unavailable",
-    healingAction: "alternative",
-    alternative: "使用备选工具",
-    successRate: 75,
-  },
-  {
-    id: "ask_user_on_ambiguity",
-    triggerCondition: "ambiguous_input",
-    healingAction: "ask_user",
-    successRate: 95,
-  },
-];
+// 注意: RETRY_STRATEGIES 和 SELF_HEALING_ACTIONS 已迁移到 src/agent/constants/index.ts
 
 /**
  * 任务上下文 - 当前环境信息
@@ -1495,18 +1327,7 @@ export interface InteractionConfig {
   proactiveSuggestions: boolean;
 }
 
-/**
- * v2.9.58: 默认交互配置
- */
-export const DEFAULT_INTERACTION_CONFIG: InteractionConfig = {
-  clarificationThreshold: 0.7,
-  confirmDestructiveOps: true,
-  offerAlternatives: true,
-  allowFreeformResponse: true,
-  largeOperationThreshold: 100,
-  enableStepReflection: true,
-  proactiveSuggestions: true,
-};
+// 注意: DEFAULT_INTERACTION_CONFIG 已迁移到 src/agent/constants/index.ts
 
 /**
  * v2.9.6: 校验规则配置 - 可启用/禁用特定规则
@@ -15535,9 +15356,8 @@ ${historyText || "(刚开始，还没有执行任何操作)"}
 
 // ========== Agent 记忆系统 v2.9.19 ==========
 
-const MEMORY_STORAGE_KEY = "agent_memory_v2";
-const USER_PROFILE_STORAGE_KEY = "agent_user_profile_v1";
-const WORKBOOK_CACHE_STORAGE_KEY = "agent_workbook_cache_v1";
+// 注意: 存储键常量已迁移到 src/agent/constants/index.ts
+// MEMORY_STORAGE_KEY, USER_PROFILE_STORAGE_KEY, WORKBOOK_CACHE_STORAGE_KEY
 
 /**
  * 持久化的任务记录（简化版，用于存储）
@@ -16473,3 +16293,7 @@ export * from "./types";
 // ========== 工作流重导出（向后兼容）==========
 // 工作流实现已抽取到 src/agent/workflow/ 目录
 export * from "./workflow";
+
+// ========== 常量重导出（向后兼容）==========
+// 常量已抽取到 src/agent/constants/ 目录
+export * from "./constants";
