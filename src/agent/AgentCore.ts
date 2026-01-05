@@ -9558,16 +9558,21 @@ ${toolDescriptions}
 
   /**
    * v2.9.29: 将 LLM 生成的计划转换为 ExecutionPlan
+   * v3.1.1: 修复 dependsOn 使用工具名而非步骤ID的bug
    */
   private convertLLMPlanToExecutionPlan(llmPlan: LLMGeneratedPlan, task: AgentTask): ExecutionPlan {
+    // 第一遍：生成所有步骤的 ID
+    const stepIds = llmPlan.steps.map(() => this.generateId());
+
+    // 第二遍：构建步骤，使用正确的 step ID 作为 dependsOn
     const steps: PlanStep[] = llmPlan.steps.map((s, idx) => ({
-      id: this.generateId(),
+      id: stepIds[idx],
       order: s.order || idx,
       phase: this.inferPhaseFromAction(s.action),
       description: s.description || `执行 ${s.action}`,
       action: s.action,
       parameters: s.parameters || {},
-      dependsOn: idx > 0 ? [llmPlan.steps[idx - 1].action] : [],
+      dependsOn: idx > 0 ? [stepIds[idx - 1]] : [], // 使用上一步的 ID，而非工具名
       successCondition: {
         type: (s.successCondition as "tool_success" | "value_check") || "tool_success",
       },
