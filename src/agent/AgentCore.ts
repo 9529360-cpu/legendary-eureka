@@ -151,6 +151,9 @@ import {
 } from "./constants";
 import type { ExpertAgentType } from "./constants";
 
+// ========== 工具注册（从 registry 模块导入） ==========
+import { ToolRegistry } from "./registry";
+
 // ========== v2.9.47: 类型化工作流事件系统 (借鉴 LlamaIndex Workflows) ==========
 // 注意: 工作流实现已迁移到 src/agent/workflow/ 目录
 // 此处保留注释以说明历史，实际实现从 workflow 模块导入
@@ -1368,120 +1371,7 @@ export interface CriticalErrorResult {
 }
 
 // ========== 工具注册中心 ==========
-
-/**
- * ToolRegistry - 工具注册中心
- *
- * Agent 通过这里获取可用的工具
- * 支持动态注册/注销工具
- */
-export class ToolRegistry {
-  private tools: Map<string, Tool> = new Map();
-  private categories: Map<string, Set<string>> = new Map();
-
-  /**
-   * 注册工具
-   */
-  register(tool: Tool): void {
-    this.tools.set(tool.name, tool);
-
-    // 更新分类索引
-    if (!this.categories.has(tool.category)) {
-      this.categories.set(tool.category, new Set());
-    }
-    this.categories.get(tool.category)!.add(tool.name);
-
-    console.log(`[ToolRegistry] Registered tool: ${tool.name} (${tool.category})`);
-  }
-
-  /**
-   * 批量注册工具
-   */
-  registerMany(tools: Tool[]): void {
-    tools.forEach((t) => this.register(t));
-  }
-
-  /**
-   * 注销工具
-   */
-  unregister(toolName: string): boolean {
-    const tool = this.tools.get(toolName);
-    if (tool) {
-      this.tools.delete(toolName);
-      this.categories.get(tool.category)?.delete(toolName);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * 获取工具
-   */
-  get(toolName: string): Tool | undefined {
-    return this.tools.get(toolName);
-  }
-
-  /**
-   * 获取工具（别名，兼容 SelfReflection.ToolRegistry 接口）
-   */
-  getTool(toolName: string): Tool | undefined {
-    return this.tools.get(toolName);
-  }
-
-  /**
-   * 获取所有工具
-   */
-  getAll(): Tool[] {
-    return Array.from(this.tools.values());
-  }
-
-  /**
-   * 获取所有工具（别名，兼容 SelfReflection.ToolRegistry 接口）
-   */
-  getAllTools(): Tool[] {
-    return Array.from(this.tools.values());
-  }
-
-  /**
-   * 按分类获取工具
-   */
-  getByCategory(category: string): Tool[] {
-    const toolNames = this.categories.get(category);
-    if (!toolNames) return [];
-    return Array.from(toolNames)
-      .map((name) => this.tools.get(name)!)
-      .filter(Boolean);
-  }
-
-  /**
-   * 获取所有分类
-   */
-  getCategories(): string[] {
-    return Array.from(this.categories.keys());
-  }
-
-  /**
-   * 生成工具描述（给 LLM 用）
-   */
-  generateToolsDescription(): string {
-    const tools = this.getAll();
-    return tools
-      .map((tool) => {
-        const params = tool.parameters
-          .map((p) => `  - ${p.name}: ${p.description}${p.required ? " (必需)" : ""}`)
-          .join("\n");
-        return `**${tool.name}** [${tool.category}]\n${tool.description}\n参数:\n${params}`;
-      })
-      .join("\n\n");
-  }
-
-  /**
-   * 列出所有工具名称
-   */
-  list(): string[] {
-    return Array.from(this.tools.keys());
-  }
-}
+// 注意: ToolRegistry 类已迁移到 src/agent/registry/ToolRegistry.ts
 
 // ========== Agent 核心引擎 ==========
 
@@ -16297,3 +16187,7 @@ export * from "./workflow";
 // ========== 常量重导出（向后兼容）==========
 // 常量已抽取到 src/agent/constants/ 目录
 export * from "./constants";
+
+// ========== 工具注册重导出（向后兼容）==========
+// ToolRegistry 已抽取到 src/agent/registry/ 目录
+export * from "./registry";
