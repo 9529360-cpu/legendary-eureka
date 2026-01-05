@@ -153,10 +153,28 @@ npm run test:coverage # 覆盖率报告
 
 ## 注意事项
 
-1. **Office Add-in 环境**: 必须使用 HTTPS (`https://localhost:3000`)
-2. **ESLint 规则**: 启用了 `eslint-plugin-office-addins`，确保正确使用 `ctx.sync()`
-3. **中文支持**: 所有用户可见文本使用中文
-4. **版本约定**: 遵循 `PROJECT_DOCUMENTATION.md` 中的架构演进记录
+1. **⚠️ 编码问题（最常见！）**: 中文乱码问题频繁出现，详见 `docs/TROUBLESHOOTING.md` 顶部
+2. **Office Add-in 环境**: 必须使用 HTTPS (`https://localhost:3000`)
+3. **ESLint 规则**: 启用了 `eslint-plugin-office-addins`，确保正确使用 `ctx.sync()`
+4. **中文支持**: 所有用户可见文本使用中文
+
+## 编码问题速查 ⚠️
+
+> **这是本项目最频繁出现的问题！每次写文件前必须注意！**
+
+```powershell
+# ✅ 正确：用 Node.js 或 VS Code 创建文件
+node -e "require('fs').writeFileSync('file.md', '内容', 'utf8')"
+
+# ❌ 错误：PowerShell 重定向（会产生乱码！）
+echo "内容" > file.md
+
+# 修复乱码文件
+node scripts/clean_encoding.cjs <file>
+node scripts/fix_encoding.js  # 专门修复 App.tsx
+```
+
+详细说明见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## 调试技巧
 
@@ -180,6 +198,8 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Microsoft\Office\16.0\Wef"
 |---|---|
 | `scripts/clear_wef.ps1` | 清除 Office Add-in 缓存 |
 | `scripts/stop_port_3000.ps1` | 释放被占用的 3000 端口 |
+| `scripts/fix_encoding.js` | 修复 App.tsx 中文乱码 |
+| `scripts/clean_encoding.cjs` | 清理任意文件的不可见字符 |
 | `npm run stop` | 停止 Office Add-in 调试会话 |
 
 ### 调试流程
