@@ -1,5 +1,68 @@
 # Excel 智能助手 Add-in - Copilot 开发指南
 
+---
+
+## 🚨 AI 代码规范（写代码前必读）
+
+> **以下是 AI 写代码时最容易犯的错误，每次写代码前必须检查！**
+
+### ❌ 绝对禁止
+
+| 错误 | 后果 | 正确做法 |
+|------|------|----------|
+| PowerShell 重定向写文件 `echo "内容" > file` | 中文乱码 | 用 `create_file` 工具或 Node.js |
+| 不看现有代码就写新代码 | 风格不一致、重复造轮子 | 先 `read_file` 查看相关文件 |
+| 凭空猜测 API 或函数签名 | 运行时错误 | 先搜索现有实现 |
+| 修改文件不验证 | 引入 bug 不知道 | 改完运行 `npm run build:dev` |
+| 硬编码中文字符串到多处 | 维护困难 | 使用常量或配置 |
+| 在 UI 层直接调用 Excel API | 架构违规 | 通过 Agent 工具层调用 |
+
+### ✅ 必须遵守
+
+| 规范 | 说明 |
+|------|------|
+| **先读后写** | 修改任何文件前，先读取该文件了解上下文 |
+| **写完验证** | 每次改代码后运行 `npm run build:dev` 检查编译 |
+| **UTF-8 编码** | 所有文件必须是 UTF-8 无 BOM |
+| **遵循现有模式** | 新代码必须与现有代码风格一致 |
+| **中文注释** | 用户可见文本和注释使用中文 |
+
+### 📋 写代码前检查清单
+
+1. [ ] 我读过要修改的文件了吗？
+2. [ ] 我知道现有的代码风格吗？
+3. [ ] 我用的 API/函数确实存在吗？
+4. [ ] 写完后我会验证构建吗？
+5. [ ] 我用的是正确的编码方式吗？
+
+### 🔴 本项目历史踩坑记录
+
+| 错误场景 | 具体问题 | 教训 |
+|----------|----------|------|
+| dependsOn 字段 | 用工具名 `excel_create_sheet` 做依赖 | 必须用步骤 ID，不是工具名 |
+| App.tsx 乱码 | PowerShell 写文件导致中文变 `浣犲ソ` | 用 Node.js 或 VS Code 写文件 |
+| README.md 损坏 | 编辑器自动转换编码 | 验证文件编码 |
+| 重复定义类型 | 不知道 `src/agent/types/` 已有定义 | 先搜索再定义 |
+| Excel API 报错 | 忘记 `ctx.sync()` 或 `load()` | 看 ESLint 警告 |
+| 工具不存在 | 调用了不存在的工具函数 | 查 `ExcelAdapter.ts` 工具列表 |
+
+### 🛠️ 常见修复命令
+
+```bash
+# 编码问题
+node scripts/clean_encoding.cjs <file>    # 清理不可见字符
+node scripts/fix_encoding.js              # 修复 App.tsx
+
+# 构建验证
+npm run build:dev                          # 检查 TypeScript 编译
+npm run lint:fix                           # 修复 lint 问题
+
+# 缓存问题
+.\scripts\clear_wef.ps1                    # 清除 Office 缓存
+```
+
+---
+
 ## 项目概述
 
 这是一个 AI 驱动的 Excel Office Add-in，使用 **ReAct Agent 架构** 将自然语言指令转换为 Excel 操作。
