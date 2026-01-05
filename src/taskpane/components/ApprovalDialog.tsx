@@ -37,7 +37,6 @@ import {
   DismissCircleFilled,
   ArrowUndoRegular,
   DocumentTableRegular,
-  NumberSymbolRegular,
 } from "@fluentui/react-icons";
 import type { ApprovalRequest, RiskLevel } from "../../agent/ApprovalManager";
 

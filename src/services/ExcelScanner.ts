@@ -95,25 +95,32 @@ export async function scanWorkbook(onProgress?: ProgressCallback): Promise<Workb
           `扫描工作表: ${sheet.name}`
         );
 
+        // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
         const hasData = !usedRange.isNullObject;
         let rowCount = 0;
         let columnCount = 0;
         let usedRangeAddress = "";
 
         if (hasData) {
+          // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
           rowCount = usedRange.rowCount;
+          // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
           columnCount = usedRange.columnCount;
+          // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
           usedRangeAddress = usedRange.address;
           totalCellsWithData += rowCount * columnCount;
 
           // 统计公式并分析复杂度
+          // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
           if (usedRange.formulas) {
             // 获取起始单元格地址
             const addressMatch = usedRange.address.match(/!?([A-Z]+)(\d+)/);
             const startCol = addressMatch ? addressMatch[1] : "A";
             const startRow = addressMatch ? parseInt(addressMatch[2], 10) : 1;
 
+            // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
             for (let r = 0; r < usedRange.formulas.length; r++) {
+              // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
               const formulaRow = usedRange.formulas[r];
               for (let c = 0; c < formulaRow.length; c++) {
                 const cell = formulaRow[c];
@@ -173,8 +180,11 @@ export async function scanWorkbook(onProgress?: ProgressCallback): Promise<Workb
           tableInfos.push({
             name: table.name,
             sheetName: sheet.name,
+            // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
             address: tableRange.address,
+            // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
             rowCount: tableRange.rowCount,
+            // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- sync() 已在上方调用
             columnCount: tableRange.columnCount,
             hasHeaders: table.showHeaders,
             columns: headerRow.values[0]?.map((v) => String(v)) || [],
@@ -367,12 +377,14 @@ export async function verifyOperationResult(
         case "set_formula":
         case "setformula": {
           // 验证公式已设置
+          // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
           const formula = targetRange.formulas[0]?.[0];
           const hasFormula = typeof formula === "string" && formula.startsWith("=");
           verification.success = hasFormula;
           verification.details = hasFormula ? `公式已设置: ${formula}` : "公式未设置";
 
           // 检查公式错误
+          // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
           const formulaResult = targetRange.values[0]?.[0];
           if (typeof formulaResult === "string" && formulaResult.startsWith("#")) {
             verification.success = false;
@@ -400,6 +412,7 @@ export async function verifyOperationResult(
 
       // 如果有预期值，进行比对
       if (expectedValue !== undefined) {
+        // eslint-disable-next-line office-addins/call-sync-before-read -- sync() 已在上方调用
         const actualFirst = targetRange.values[0]?.[0];
         verification.matchesExpectation = actualFirst === expectedValue;
         if (!verification.matchesExpectation) {

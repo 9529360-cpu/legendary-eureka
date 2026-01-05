@@ -4,7 +4,7 @@
  * 从 AgentCore.ts 抽取，借鉴 LlamaIndex Workflows 设计
  */
 
-import type { ToolResult, ToolCallInfo, ToolCallResultData } from "./tool";
+import type { ToolResult, ToolCallInfo } from "./tool";
 
 // ========== 工作流事件相关类型 ==========
 

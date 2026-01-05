@@ -6,6 +6,13 @@
  * @version 1.0.0
  */
 
+// ============ 内部导入（用于初始化函数）============
+import { SecurityManager } from "./SecurityManager";
+import { ConfigManager } from "./ConfigManager";
+import { ConversationMemory } from "./ConversationMemory";
+import { TraceContext } from "./TraceContext";
+import { TaskExecutionMonitor } from "./TaskExecutionMonitor";
+
 // ============ 任务执行与监控 ============
 
 export {

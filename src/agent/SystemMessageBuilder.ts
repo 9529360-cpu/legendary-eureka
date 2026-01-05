@@ -20,7 +20,6 @@
  * @see docs/AI_AGENTS_FOR_BEGINNERS_LEARNING.md
  */
 
-import { Logger } from "../utils/Logger";
 import type { Tool } from "./AgentCore";
 
 // ============================================================================

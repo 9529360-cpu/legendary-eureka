@@ -19,6 +19,8 @@
  * @packageDocumentation
  */
 
+/* eslint-disable office-addins/call-sync-after-load, office-addins/call-sync-before-read */
+
 import { Tool } from "../../types";
 import { excelRun } from "./common";
 
@@ -61,14 +63,15 @@ export function createSortTool(): Tool {
 
         range.load("address");
         await ctx.sync();
+        const rangeAddress = range.address;
 
         range.sort.apply([{ key: column, ascending }]);
         await ctx.sync();
 
         return {
           success: true,
-          output: `已按第${column + 1}列（${String.fromCharCode(65 + column)}列）${ascending ? "升序" : "降序"}排序 ${range.address}`,
-          data: { address: range.address, column, ascending },
+          output: `已按第${column + 1}列（${String.fromCharCode(65 + column)}列）${ascending ? "升序" : "降序"}排序 ${rangeAddress}`,
+          data: { address: rangeAddress, column, ascending },
         };
       });
     },
@@ -116,6 +119,7 @@ export function createFilterTool(): Tool {
         const range = sheet.getRange(address);
         range.load("address, rowCount, columnCount");
         await ctx.sync();
+        const rangeAddress = range.address;
 
         try {
           sheet.autoFilter.apply(range, column);
@@ -123,8 +127,8 @@ export function createFilterTool(): Tool {
 
           return {
             success: true,
-            output: `已在 ${range.address} 上应用自动筛选：第${column + 1}列`,
-            data: { address: range.address, column, criteria },
+            output: `已在 ${rangeAddress} 上应用自动筛选：第${column + 1}列`,
+            data: { address: rangeAddress, column, criteria },
           };
         } catch (filterError) {
           try {
@@ -136,8 +140,8 @@ export function createFilterTool(): Tool {
 
             return {
               success: true,
-              output: `已在 ${range.address} 上应用筛选：第${column + 1}列 = "${criteria}"`,
-              data: { address: range.address, column, criteria },
+              output: `已在 ${rangeAddress} 上应用筛选：第${column + 1}列 = "${criteria}"`,
+              data: { address: rangeAddress, column, criteria },
             };
           } catch (_retryError) {
             return {
@@ -285,7 +289,7 @@ export function createFindReplaceTool(): Tool {
 
         return {
           success: true,
-          output: `已替换 ${replaceCount} 处: "${findText}" → "${replaceText}"`,
+          output: `已替换 ${replaceCount} 处: "${findText}"  "${replaceText}"`,
         };
       });
     },
@@ -321,16 +325,16 @@ export function createFillSeriesTool(): Tool {
         startCell.load("values, address");
         endCell.load("address");
         await ctx.sync();
-
         const startValue = startCell.values[0][0];
         const rangeAddress = `${params.startCell}:${params.endCell}`;
         const range = sheet.getRange(rangeAddress);
         range.load("rowCount, columnCount");
         await ctx.sync();
-
         const step = (params.step as number) || 1;
-        const isVertical = range.rowCount > range.columnCount;
-        const count = isVertical ? range.rowCount : range.columnCount;
+        const rowCount = range.rowCount;
+        const columnCount = range.columnCount;
+        const isVertical = rowCount > columnCount;
+        const count = isVertical ? rowCount : columnCount;
 
         const values: unknown[][] = [];
         for (let i = 0; i < (isVertical ? count : 1); i++) {
@@ -599,14 +603,13 @@ export function createMoveRangeTool(): Tool {
         const sourceRange = sheet.getRange(sourceAddress);
         const targetRange = sheet.getRange(targetCell);
 
-        sourceRange.load("values, formulas, numberFormat");
+        sourceRange.load("values, formulas, numberFormat, rowCount, columnCount");
         await ctx.sync();
-
-        const values = sourceRange.values;
+        const _values = sourceRange.values;
         const formulas = sourceRange.formulas;
         const formats = sourceRange.numberFormat;
-        const rowCount = values.length;
-        const colCount = values[0].length;
+        const rowCount = sourceRange.rowCount;
+        const colCount = sourceRange.columnCount;
 
         const targetFullRange = targetRange.getResizedRange(rowCount - 1, colCount - 1);
 
@@ -673,13 +676,12 @@ export function createCopyRangeTool(): Tool {
         const sourceRange = sourceSheet.getRange(sourceAddress);
         const targetRange = targetSheet.getRange(targetCell);
 
-        sourceRange.load("values, formulas, numberFormat");
+        sourceRange.load("values, formulas, numberFormat, rowCount, columnCount");
         await ctx.sync();
-
         const formulas = sourceRange.formulas;
         const formats = sourceRange.numberFormat;
-        const rowCount = formulas.length;
-        const colCount = formulas[0].length;
+        const rowCount = sourceRange.rowCount;
+        const colCount = sourceRange.columnCount;
 
         const targetFullRange = targetRange.getResizedRange(rowCount - 1, colCount - 1);
 

@@ -1,25 +1,25 @@
-import { SpecCompiler, SpecCompileContext } from './SpecCompiler';
-import { IntentSpec, WriteDataSpec, FormulaSpec, SheetSpec } from './types/intent';
+import { SpecCompiler, SpecCompileContext } from "./SpecCompiler";
+import { IntentSpec, WriteDataSpec, FormulaSpec, SheetSpec } from "./types/intent";
 
-describe('SpecCompiler', () => {
+describe("SpecCompiler", () => {
   let compiler: SpecCompiler;
 
   beforeEach(() => {
     compiler = new SpecCompiler();
   });
 
-  describe('compressedIntent routing', () => {
-    it('sets routing hint for failure intent', () => {
+  describe("compressedIntent routing", () => {
+    it("sets routing hint for failure intent", () => {
       const spec: IntentSpec = {
-        intent: 'write_data',
+        intent: "write_data",
         confidence: 0.9,
         needsClarification: false,
         spec: {
-          type: 'write_data',
-          target: 'A1',
-          data: [['test']],
+          type: "write_data",
+          target: "A1",
+          data: [["test"]],
         } as WriteDataSpec,
-        compressedIntent: 'failure',
+        compressedIntent: "failure",
       };
 
       const context: SpecCompileContext = {};
@@ -31,22 +31,22 @@ describe('SpecCompiler', () => {
         priority: string;
         addDiagnosticStep: boolean;
       };
-      expect(hint.priority).toBe('diagnose');
+      expect(hint.priority).toBe("diagnose");
       expect(hint.addDiagnosticStep).toBe(true);
     });
 
-    it('sets routing hint for automation intent', () => {
+    it("sets routing hint for automation intent", () => {
       const spec: IntentSpec = {
-        intent: 'create_formula',
+        intent: "create_formula",
         confidence: 0.85,
         needsClarification: false,
         spec: {
-          type: 'formula',
-          targetCell: 'B2',
-          formulaType: 'sum',
-          sourceRange: 'A:A',
+          type: "formula",
+          targetCell: "B2",
+          formulaType: "sum",
+          sourceRange: "A:A",
         } as FormulaSpec,
-        compressedIntent: 'automation',
+        compressedIntent: "automation",
       };
 
       const context: SpecCompileContext = {};
@@ -56,21 +56,21 @@ describe('SpecCompiler', () => {
         priority: string;
         suggestedTools: string[];
       };
-      expect(hint.priority).toBe('batch');
-      expect(hint.suggestedTools).toContain('excel_fill_formula');
+      expect(hint.priority).toBe("batch");
+      expect(hint.suggestedTools).toContain("excel_fill_formula");
     });
 
-    it('sets routing hint for structure intent', () => {
+    it("sets routing hint for structure intent", () => {
       const spec: IntentSpec = {
-        intent: 'create_sheet',
+        intent: "create_sheet",
         confidence: 0.8,
         needsClarification: false,
         spec: {
-          type: 'sheet',
-          operation: 'create',
-          sheetName: 'NewSheet',
+          type: "sheet",
+          operation: "create",
+          sheetName: "NewSheet",
         } as SheetSpec,
-        compressedIntent: 'structure',
+        compressedIntent: "structure",
       };
 
       const context: SpecCompileContext = {};
@@ -80,21 +80,21 @@ describe('SpecCompiler', () => {
         priority: string;
         message: string;
       };
-      expect(hint.priority).toBe('refactor');
-      expect(hint.message).toContain('结构');
+      expect(hint.priority).toBe("refactor");
+      expect(hint.message).toContain("结构");
     });
 
-    it('sets routing hint for maintainability intent', () => {
+    it("sets routing hint for maintainability intent", () => {
       const spec: IntentSpec = {
-        intent: 'write_data',
+        intent: "write_data",
         confidence: 0.9,
         needsClarification: false,
         spec: {
-          type: 'write_data',
-          target: 'A1',
-          data: [['protected data']],
+          type: "write_data",
+          target: "A1",
+          data: [["protected data"]],
         } as WriteDataSpec,
-        compressedIntent: 'maintainability',
+        compressedIntent: "maintainability",
       };
 
       const context: SpecCompileContext = {};
@@ -104,19 +104,19 @@ describe('SpecCompiler', () => {
         priority: string;
         suggestedTools: string[];
       };
-      expect(hint.priority).toBe('protect');
-      expect(hint.suggestedTools).toContain('excel_protect_sheet');
+      expect(hint.priority).toBe("protect");
+      expect(hint.suggestedTools).toContain("excel_protect_sheet");
     });
 
-    it('handles missing compressedIntent gracefully', () => {
+    it("handles missing compressedIntent gracefully", () => {
       const spec: IntentSpec = {
-        intent: 'write_data',
+        intent: "write_data",
         confidence: 0.9,
         needsClarification: false,
         spec: {
-          type: 'write_data',
-          target: 'A1',
-          data: [['test']],
+          type: "write_data",
+          target: "A1",
+          data: [["test"]],
         } as WriteDataSpec,
         // no compressedIntent
       };

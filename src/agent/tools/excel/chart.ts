@@ -104,6 +104,9 @@ export function createChartTrendlineTool(): Tool {
     execute: async (params) => {
       return await excelRun(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(params.sheet as string);
+        sheet.load("charts");
+        await ctx.sync();
+        // eslint-disable-next-line office-addins/call-sync-after-load, office-addins/call-sync-before-read
         const charts = sheet.charts;
         charts.load("items");
         await ctx.sync();

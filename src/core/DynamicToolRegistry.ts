@@ -15,8 +15,8 @@
  * - 工具扩展性不足
  */
 
-import { Tool, ToolResult, ToolParameter } from "../agent/AgentCore";
-import { ToolProtocol, ToolCapability, ToolRiskLevel, ToolEnvironment } from "./ToolProtocol";
+import { Tool, ToolResult } from "../agent/AgentCore";
+import { ToolProtocol, ToolCapability, ToolRiskLevel } from "./ToolProtocol";
 import { TaskExecutionMonitor } from "./TaskExecutionMonitor";
 import { Logger } from "../utils/Logger";
 

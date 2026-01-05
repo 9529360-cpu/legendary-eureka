@@ -1060,7 +1060,7 @@ function createSmartFormulaTool(): Tool {
 
         let useTableRef = false;
         let tableName = "";
-        let columnMappingInfo = "";
+        let _columnMappingInfo = "";
 
         if (tables.items.length > 0) {
           // \u6709 Table\uFF0C\u53EF\u4EE5\u4F7F\u7528\u7ED3\u6784\u5316\u5F15\u7528
@@ -3494,6 +3494,8 @@ function createChartTrendlineTool(): Tool {
     execute: async (params) => {
       return await excelRun(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(params.sheet as string);
+        sheet.load("charts");
+        await ctx.sync();
         const charts = sheet.charts;
         charts.load("items");
         await ctx.sync();
@@ -4297,6 +4299,8 @@ function createFreezePanesTool(): Tool {
     execute: async (params) => {
       return await excelRun(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(params.sheet as string);
+        sheet.load("freezePanes");
+        await ctx.sync();
         const freezePane = sheet.freezePanes;
         const action = params.action as string;
 
@@ -4541,6 +4545,8 @@ function createPageSetupTool(): Tool {
     execute: async (params) => {
       return await excelRun(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(params.sheet as string);
+        sheet.load("pageLayout");
+        await ctx.sync();
         const pageLayout = sheet.pageLayout;
 
         if (params.orientation) {

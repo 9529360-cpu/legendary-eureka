@@ -21,7 +21,7 @@
  * - 支持回滚操作
  */
 
-import { FormulaValidator, ExecutionError, ExcelErrorType } from "./FormulaValidator";
+import { FormulaValidator } from "./FormulaValidator";
 import { ExecutionPlan, PlanStep, StepResult } from "./TaskPlanner";
 
 // 本地定义 ExcelError 类型
@@ -306,7 +306,7 @@ export class ExecutionEngine {
           });
           break;
 
-        case "excel_write_range":
+        case "excel_write_range": {
           // 先读取原始值用于回滚
           const originalValues = await this.excelOperations.readRange(
             step.parameters.sheet as string,
@@ -331,6 +331,7 @@ export class ExecutionEngine {
             },
           });
           break;
+        }
 
         case "excel_set_formula":
           result = await this.excelOperations.setFormula(

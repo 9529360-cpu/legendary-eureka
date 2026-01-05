@@ -8,12 +8,7 @@
  * - 统计分析
  */
 
-import {
-  TaskExecutionMonitor,
-  TaskPhase,
-  AlertLevel,
-  TaskExecutionRecord,
-} from "../core/TaskExecutionMonitor";
+import { TaskExecutionMonitor, TaskPhase, AlertLevel } from "../core/TaskExecutionMonitor";
 
 describe("TaskExecutionMonitor", () => {
   beforeEach(() => {

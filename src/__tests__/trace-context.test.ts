@@ -8,7 +8,7 @@
  * - 导出功能
  */
 
-import { TraceContext, Trace, Span, SpanType } from "../core/TraceContext";
+import { TraceContext, SpanType } from "../core/TraceContext";
 
 describe("TraceContext", () => {
   beforeEach(() => {
@@ -208,7 +208,7 @@ describe("TraceContext", () => {
     beforeEach(() => {
       // 创建多个追踪用于统计
       for (let i = 0; i < 5; i++) {
-        const trace = TraceContext.startTrace(`perf-trace-${i}`);
+        const _trace = TraceContext.startTrace(`perf-trace-${i}`);
 
         TraceContext.startSpan("http-span", SpanType.HTTP);
         TraceContext.endSpan();

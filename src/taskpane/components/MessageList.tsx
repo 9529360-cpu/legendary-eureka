@@ -193,12 +193,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       const el = messagesEndRef.current as HTMLElement & { scrollIntoView?: unknown };
       if (typeof el.scrollIntoView === "function") {
         // 优先使用原生 scrollIntoView
-        (el.scrollIntoView as (opts?: ScrollIntoViewOptions) => void)({ behavior: "smooth" });
+        (el.scrollIntoView as (opts?: { behavior?: string }) => void)({ behavior: "smooth" });
       } else if (containerRef.current) {
         // jsdom 环境可能没有实现 scrollIntoView，回退到设置容器滚动位置
         try {
           containerRef.current.scrollTop = containerRef.current.scrollHeight;
-        } catch (e) {
+        } catch (_e) {
           // 忽略任何在非浏览器环境可能抛出的错误
         }
       }

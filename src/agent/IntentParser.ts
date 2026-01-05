@@ -337,7 +337,7 @@ export class IntentParser {
   /**
    * 创建降级规格
    */
-  private createFallbackSpec(userMessage: string): IntentSpec {
+  private createFallbackSpec(_userMessage: string): IntentSpec {
     return {
       intent: "clarify",
       confidence: 0.3,

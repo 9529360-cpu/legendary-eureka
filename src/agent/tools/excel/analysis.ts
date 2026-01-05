@@ -14,6 +14,8 @@
  * @packageDocumentation
  */
 
+/* eslint-disable office-addins/call-sync-after-load, office-addins/call-sync-before-read, office-addins/load-object-before-read */
+
 import { Tool } from "../../types";
 import { excelRun } from "./common";
 

@@ -7,7 +7,7 @@
 function tryJsonParse(input: string): any | null {
   try {
     return JSON.parse(input);
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
@@ -16,14 +16,14 @@ function stripCodeFences(text: string): string {
   return text.replace(/```[\s\S]*?```/g, (m) => {
     // remove surrounding ``` and optional language tag, keep inner content
     // match opening fence with optional language: ```json\n
-    const inner = m.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+    const inner = m.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
     return inner;
   });
 }
 
 function firstJsonLikeSegment(text: string): string | null {
   // Try to find first {...} or [...] group with balanced braces
-  const startChars = ['{', '['];
+  const startChars = ["{", "["];
   for (const start of startChars) {
     const stack: string[] = [];
     let started = false;
@@ -38,8 +38,8 @@ function firstJsonLikeSegment(text: string): string | null {
         }
       } else {
         buf += ch;
-        if (ch === '{' || ch === '[') stack.push(ch);
-        else if (ch === '}' || ch === ']') {
+        if (ch === "{" || ch === "[") stack.push(ch);
+        else if (ch === "}" || ch === "]") {
           const last = stack.pop();
           if (!last) {
             // unbalanced
@@ -61,21 +61,21 @@ function tidyJsonLike(text: string): string {
   // Replace single quotes for object keys/strings when safe
   let s = text.trim();
   // 如果文本并非以 JSON 起始符号开头，则可能包含前导标签（例如 "Result: {..}"）
-  if (!s.startsWith('{') && !s.startsWith('[')) {
-    s = s.replace(/^.*?:\s*/, '');
+  if (!s.startsWith("{") && !s.startsWith("[")) {
+    s = s.replace(/^.*?:\s*/, "");
   }
 
   // Remove code fences
   s = stripCodeFences(s);
 
   // Remove trailing commas before closing braces/brackets
-  s = s.replace(/,\s*(}|\])/g, '$1');
+  s = s.replace(/,\s*(}|\])/g, "$1");
 
   return s;
 }
 
 export function parseLlmOutput(text: string): { ok: boolean; data?: any; error?: string } {
-  if (!text || typeof text !== 'string') return { ok: false, error: 'empty input' };
+  if (!text || typeof text !== "string") return { ok: false, error: "empty input" };
 
   // 1. Try direct parse
   let direct = tryJsonParse(text);
@@ -102,11 +102,11 @@ export function parseLlmOutput(text: string): { ok: boolean; data?: any; error?:
 
   // 4. Try to recover by replacing single quotes and removing trailing commas globally
   const replaced = tidyJsonLike(noFences).replace(/'/g, '"');
-  const cleaned = replaced.replace(/,\s*([}\]])/g, '$1');
+  const cleaned = replaced.replace(/,\s*([}\]])/g, "$1");
   const finalTry = tryJsonParse(cleaned);
   if (finalTry !== null) return { ok: true, data: finalTry };
 
-  return { ok: false, error: 'unable to parse JSON' };
+  return { ok: false, error: "unable to parse JSON" };
 }
 
 export default parseLlmOutput;

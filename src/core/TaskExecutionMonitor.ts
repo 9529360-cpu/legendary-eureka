@@ -15,7 +15,7 @@
  * - 缺乏全链路追踪能力
  */
 
-import { Logger, LogLevel } from "../utils/Logger";
+import { Logger } from "../utils/Logger";
 import { TOOL_NAMES } from "../config/constants";
 
 // ========== 类型定义 ==========

@@ -1,23 +1,29 @@
 /**
  * DeepSeekAdapter - DeepSeek 模型适配器
- * 
+ *
  * 单一职责：适配 DeepSeek API
  * 行数上限：300 行
  */
 
-import { BaseAdapter, ModelConfig, ChatMessage, ModelResponse, ToolCallRequest } from './BaseAdapter';
-import { ToolContract } from '../contracts/ToolContract';
+import {
+  BaseAdapter,
+  ModelConfig,
+  ChatMessage,
+  ModelResponse,
+  ToolCallRequest,
+} from "./BaseAdapter";
+import { ToolContract } from "../contracts/ToolContract";
 
 // ========== DeepSeek 配置 ==========
 
-const DEEPSEEK_API_BASE = 'https://api.deepseek.com';
-const DEEPSEEK_CHAT_ENDPOINT = '/chat/completions';
+const DEEPSEEK_API_BASE = "https://api.deepseek.com";
+const DEEPSEEK_CHAT_ENDPOINT = "/chat/completions";
 
 /**
  * DeepSeek 特定配置
  */
 export interface DeepSeekConfig extends ModelConfig {
-  model: 'deepseek-chat' | 'deepseek-coder' | string;
+  model: "deepseek-chat" | "deepseek-coder" | string;
 }
 
 // ========== DeepSeekAdapter 类 ==========
@@ -27,7 +33,7 @@ export interface DeepSeekConfig extends ModelConfig {
  */
 export class DeepSeekAdapter extends BaseAdapter {
   get name(): string {
-    return 'deepseek';
+    return "deepseek";
   }
 
   constructor(config: DeepSeekConfig) {
@@ -50,18 +56,16 @@ export class DeepSeekAdapter extends BaseAdapter {
 
     if (tools && tools.length > 0) {
       body.tools = this.formatToolsForApi(tools);
-      body.tool_choice = 'auto';
+      body.tool_choice = "auto";
     }
 
     try {
-      const response = await this.withTimeout(
-        this.fetchApi(DEEPSEEK_CHAT_ENDPOINT, body)
-      );
+      const response = await this.withTimeout(this.fetchApi(DEEPSEEK_CHAT_ENDPOINT, body));
       return this.parseApiResponse(response);
     } catch (error) {
       return {
         content: `DeepSeek API 错误: ${error instanceof Error ? error.message : String(error)}`,
-        finishReason: 'error',
+        finishReason: "error",
       };
     }
   }
@@ -70,7 +74,7 @@ export class DeepSeekAdapter extends BaseAdapter {
    * 生成文本
    */
   async generate(prompt: string): Promise<string> {
-    const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
+    const messages: ChatMessage[] = [{ role: "user", content: prompt }];
     const response = await this.chat(messages);
     return response.content;
   }
@@ -80,10 +84,8 @@ export class DeepSeekAdapter extends BaseAdapter {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.chat([
-        { role: 'user', content: '你好，请回复"连接成功"' },
-      ]);
-      return response.finishReason !== 'error';
+      const response = await this.chat([{ role: "user", content: '你好，请回复"连接成功"' }]);
+      return response.finishReason !== "error";
     } catch {
       return false;
     }
@@ -103,7 +105,7 @@ export class DeepSeekAdapter extends BaseAdapter {
    * 格式化消息
    */
   private formatMessages(messages: ChatMessage[]): unknown[] {
-    return messages.map(msg => ({
+    return messages.map((msg) => ({
       role: msg.role,
       content: msg.content,
       ...(msg.name && { name: msg.name }),
@@ -115,8 +117,8 @@ export class DeepSeekAdapter extends BaseAdapter {
    * 格式化工具为 API 格式
    */
   protected formatToolsForApi(tools: ToolContract[]): unknown[] {
-    return tools.map(tool => ({
-      type: 'function',
+    return tools.map((tool) => ({
+      type: "function",
       function: {
         name: tool.name,
         description: tool.description,
@@ -152,18 +154,18 @@ export class DeepSeekAdapter extends BaseAdapter {
 
     const choice = resp.choices?.[0];
     const message = choice?.message;
-    
+
     let toolCalls: ToolCallRequest[] | undefined;
     if (message?.tool_calls && message.tool_calls.length > 0) {
-      toolCalls = message.tool_calls.map(tc => ({
+      toolCalls = message.tool_calls.map((tc) => ({
         id: tc.id,
         name: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments || '{}'),
+        arguments: JSON.parse(tc.function.arguments || "{}"),
       }));
     }
 
     return {
-      content: message?.content || '',
+      content: message?.content || "",
       toolCalls,
       finishReason: this.mapFinishReason(choice?.finish_reason),
       usage: resp.usage
@@ -179,16 +181,16 @@ export class DeepSeekAdapter extends BaseAdapter {
   /**
    * 映射完成原因
    */
-  private mapFinishReason(reason?: string): ModelResponse['finishReason'] {
+  private mapFinishReason(reason?: string): ModelResponse["finishReason"] {
     switch (reason) {
-      case 'stop':
-        return 'stop';
-      case 'tool_calls':
-        return 'tool_calls';
-      case 'length':
-        return 'length';
+      case "stop":
+        return "stop";
+      case "tool_calls":
+        return "tool_calls";
+      case "length":
+        return "length";
       default:
-        return 'stop';
+        return "stop";
     }
   }
 }
@@ -199,7 +201,7 @@ export class DeepSeekAdapter extends BaseAdapter {
 export function createDeepSeekAdapter(apiKey: string, model?: string): DeepSeekAdapter {
   return new DeepSeekAdapter({
     apiKey,
-    model: model || 'deepseek-chat',
+    model: model || "deepseek-chat",
   });
 }
 

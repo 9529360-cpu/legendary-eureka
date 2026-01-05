@@ -8,7 +8,6 @@ import type { DataModel } from "../DataModeler";
 import type { ExecutionError, SampleValidationResult } from "../FormulaValidator";
 import type { ExecutionPlan, ReplanResult } from "../TaskPlanner";
 import type {
-  HardValidationRule,
   ValidationCheckResult,
   DiscoveredIssue,
   OperationRecord,

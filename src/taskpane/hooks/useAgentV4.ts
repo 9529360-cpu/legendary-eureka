@@ -174,7 +174,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
 
     // 订阅事件
     executor.on("intent:parsed", (data) => {
-      const { intent } = (data as unknown) as { intent: IntentSpec };
+      const { intent } = data as unknown as { intent: IntentSpec };
       if (verboseLogging) {
         console.log("[AgentV4] 意图解析完成:", intent.intent);
       }
@@ -202,7 +202,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("plan:compiled", (data) => {
-      const { plan } = (data as unknown) as { plan: { steps: unknown[] } };
+      const { plan } = data as unknown as { plan: { steps: unknown[] } };
       const stepCount = plan.steps.length;
 
       if (verboseLogging) {
@@ -226,7 +226,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("step:start", (data) => {
-      const { step, index, total } = (data as unknown) as {
+      const { step, index, total } = data as unknown as {
         step: { description: string };
         index: number;
         total: number;
@@ -249,7 +249,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("step:complete", (data) => {
-      const { step, result, index, total } = (data as unknown) as {
+      const { step, result, index, total } = data as unknown as {
         step: { description: string };
         result: { success: boolean };
         index: number;
@@ -277,7 +277,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("execution:complete", (data) => {
-      const { result } = (data as unknown) as { result: ExecutionResult };
+      const { result } = data as unknown as { result: ExecutionResult };
 
       if (verboseLogging) {
         console.log("[AgentV4] 执行完成:", result.success ? "成功" : "失败");
@@ -407,7 +407,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     if (legacyAgentRef.current) {
       try {
         (legacyAgentRef.current as any)?.cancel?.();
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
     }

@@ -636,7 +636,7 @@ export class DataModeler {
     // 3. 匹配本表引用: A1, $A$1, A1:B2, A:A, 1:1
     // 排除已匹配的跨表引用和 Table 引用
     const localPattern =
-      /(?<![A-Z!'"\]\w])(\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?|\$?[A-Z]+:\$?[A-Z]+|\d+:\d+)(?![(\[])/gi;
+      /(?<![A-Z!'"\]\w])(\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?|\$?[A-Z]+:\$?[A-Z]+|\d+:\d+)(?![([)])/gi;
     while ((match = localPattern.exec(formula)) !== null) {
       const ref = match[1];
 

@@ -16,7 +16,7 @@
  */
 
 import { Tool, ToolResult } from "../agent/AgentCore";
-import { TaskExecutionMonitor, TaskPhase, AlertLevel } from "./TaskExecutionMonitor";
+import { TaskExecutionMonitor } from "./TaskExecutionMonitor";
 import { Logger } from "../utils/Logger";
 import { RETRY, TIMEOUTS } from "../config/constants";
 

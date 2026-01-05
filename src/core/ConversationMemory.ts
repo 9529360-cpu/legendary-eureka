@@ -12,7 +12,6 @@
  */
 
 import { Logger } from "../utils/Logger";
-import { ConfigManager } from "./ConfigManager";
 
 /**
  * 消息类型

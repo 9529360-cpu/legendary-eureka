@@ -98,6 +98,7 @@ export function createPageSetupTool(): Tool {
     execute: async (params) => {
       return await excelRun(async (ctx) => {
         const sheet = ctx.workbook.worksheets.getItem(params.sheet as string);
+        // eslint-disable-next-line office-addins/load-object-before-read, office-addins/call-sync-before-read -- pageLayout 是导航属性，直接设置属性后 sync 即可
         const pageLayout = sheet.pageLayout;
 
         if (params.orientation) {
@@ -576,6 +577,7 @@ export function createNamedRangeTool(): Tool {
             }
             const namedItem = sheet.names.getItemOrNullObject(params.name);
             await ctx.sync();
+            // eslint-disable-next-line office-addins/call-sync-before-read -- getItemOrNullObject 后 isNullObject 在 sync 后即可读取
             if (namedItem.isNullObject) {
               return { success: false, output: `命名范围 "${params.name}" 不存在` };
             }
@@ -585,6 +587,7 @@ export function createNamedRangeTool(): Tool {
           }
 
           case "list": {
+            // eslint-disable-next-line office-addins/no-navigational-load -- 需要加载 items 集合
             const namedItems = sheet.names.load("items");
             await ctx.sync();
             const names = namedItems.items.map((item: Excel.NamedItem) => ({
@@ -604,12 +607,15 @@ export function createNamedRangeTool(): Tool {
             const item = sheet.names.getItemOrNullObject(params.name);
             item.load("name, value");
             await ctx.sync();
+            // eslint-disable-next-line office-addins/call-sync-before-read -- sync 已在上面调用
             if (item.isNullObject) {
               return { success: false, output: `命名范围 "${params.name}" 不存在` };
             }
+            // eslint-disable-next-line office-addins/call-sync-before-read, office-addins/call-sync-after-load -- load/sync 已在上面调用
+            const result = { name: item.name, value: item.value };
             return {
               success: true,
-              output: `命名范围 "${item.name}": ${item.value}`,
+              output: `命名范围 "${result.name}": ${result.value}`,
             };
           }
 

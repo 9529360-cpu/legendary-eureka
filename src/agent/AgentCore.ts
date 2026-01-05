@@ -117,22 +117,32 @@ import {
 } from "./validators/collectSignals";
 
 // ========== v3.3: AI Agents 学习模块 ==========
-import { LLMResponseValidator, RepairRetryConfig, RepairResult } from "./LLMResponseValidator";
-import { ContextCompressor, DualCompressionResult } from "./ContextCompressor";
+import {
+  LLMResponseValidator as _LLMResponseValidator,
+  RepairRetryConfig as _RepairRetryConfig,
+  RepairResult as _RepairResult,
+} from "./LLMResponseValidator";
+import {
+  ContextCompressor,
+  DualCompressionResult as _DualCompressionResult,
+} from "./ContextCompressor";
 import { ToolSelector, LLMToolSubset } from "./ToolSelector";
-import { SelfReflection, HardRuleValidationResult } from "./SelfReflection";
+import {
+  SelfReflection,
+  HardRuleValidationResult as _HardRuleValidationResult,
+} from "./SelfReflection";
 import { EpisodicMemory, ReusableExperience } from "./EpisodicMemory";
 import { SystemMessageBuilder } from "./SystemMessageBuilder";
 
 // ========== v2.9.47: 工作流系统（从 workflow 模块导入） ==========
 import {
-  createWorkflowEvent,
+  createWorkflowEvent as _createWorkflowEvent,
   createInitialWorkflowState,
-  WorkflowEvents,
-  WorkflowContext,
-  WorkflowEventRegistry,
-  WorkflowEventStream,
-  createSimpleWorkflow,
+  WorkflowEvents as _WorkflowEvents,
+  WorkflowContext as _WorkflowContext,
+  WorkflowEventRegistry as _WorkflowEventRegistry,
+  WorkflowEventStream as _WorkflowEventStream,
+  createSimpleWorkflow as _createSimpleWorkflow,
 } from "./workflow";
 import type { WorkflowState } from "./workflow";
 
@@ -146,9 +156,9 @@ import {
   MEMORY_STORAGE_KEY,
   USER_PROFILE_STORAGE_KEY,
   WORKBOOK_CACHE_STORAGE_KEY,
-  DEFAULT_MAX_ITERATIONS,
-  DEFAULT_TIMEOUT,
-  DEFAULT_WORKBOOK_CACHE_TTL,
+  DEFAULT_MAX_ITERATIONS as _DEFAULT_MAX_ITERATIONS,
+  DEFAULT_TIMEOUT as _DEFAULT_TIMEOUT,
+  DEFAULT_WORKBOOK_CACHE_TTL as _DEFAULT_WORKBOOK_CACHE_TTL,
 } from "./constants";
 // 注意: ExpertAgentType 在本文件中定义 (line ~960)，不从 constants 导入
 

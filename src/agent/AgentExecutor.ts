@@ -12,11 +12,10 @@
  */
 
 import { IntentParser, ParseContext } from "./IntentParser";
-import { SpecCompiler, CompileContext, CompileResult } from "./SpecCompiler";
+import { SpecCompiler, CompileContext } from "./SpecCompiler";
 import { ToolRegistry } from "./registry";
 import { ExecutionPlan, PlanStep } from "./TaskPlanner";
-import { Tool, ToolResult } from "./types/tool";
-import { IntentSpec } from "./types/intent";
+import { ToolResult } from "./types/tool";
 import createExcelTools from "./ExcelAdapter";
 
 // ========== 执行结果 ==========

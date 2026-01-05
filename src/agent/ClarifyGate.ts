@@ -11,7 +11,7 @@
  */
 
 import { NextAction, ClarifyQuestion, Signal, createSignal, SignalCodes } from "./AgentProtocol";
-import type { ExecutionPlan, PlanStep } from "./TaskPlanner";
+import type { ExecutionPlan } from "./TaskPlanner";
 
 // ========== 类型定义 ==========
 

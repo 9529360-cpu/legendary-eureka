@@ -156,7 +156,7 @@ class ApiService {
       }
 
       return { data: null, rawText: "", parsed: false };
-    } catch (err) {
+    } catch (_err) {
       return { data: null, rawText: "", parsed: false };
     }
   }

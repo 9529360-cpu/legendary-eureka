@@ -12,6 +12,8 @@
  * @packageDocumentation
  */
 
+/* eslint-disable office-addins/call-sync-after-load, office-addins/call-sync-before-read */
+
 import { Tool } from "../../types";
 import { excelRun, getTargetSheet, extractSheetName } from "./common";
 
@@ -56,9 +58,7 @@ export function createFormatRangeTool(): Tool {
 
       return await excelRun(async (ctx) => {
         const sheet = getTargetSheet(ctx, sheetName);
-        sheet.load("name");
         const range = sheet.getRange(address);
-
         range.load("address");
         await ctx.sync();
 

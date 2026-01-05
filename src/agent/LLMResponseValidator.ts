@@ -559,7 +559,7 @@ ${result.recovery?.suggestion ?? "请确保响应是有效的 JSON，且包含�
    */
   private static attemptRecovery(
     data: unknown,
-    issues: z.ZodIssue[]
+    _issues: z.ZodIssue[]
   ): { fixed?: unknown; suggestion?: string } {
     if (typeof data !== "object" || data === null) {
       return { suggestion: "Input must be a valid JSON object" };

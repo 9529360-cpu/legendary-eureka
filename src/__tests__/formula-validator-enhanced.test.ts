@@ -4,13 +4,7 @@
  * 测试 autoFixFormula, suggestFormula 等新功能
  */
 
-import {
-  FormulaValidator,
-  ExcelErrorType,
-  FormulaIntent,
-  FormulaContext,
-  DataModelingValidator,
-} from "../agent/FormulaValidator";
+import { FormulaValidator, ExcelErrorType, DataModelingValidator } from "../agent/FormulaValidator";
 
 describe("FormulaValidator Enhanced Tests", () => {
   let validator: FormulaValidator;

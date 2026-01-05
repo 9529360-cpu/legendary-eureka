@@ -1,23 +1,23 @@
 /**
  * AgentOrchestrator - Agent 协调器
- * 
+ *
  * 单一职责：协调整个 Agent 工作流程
  * 行数上限：400 行
- * 
+ *
  * 工作流程：
  * 用户输入 → SemanticExtractor → DiagnosticEngine → SolutionBuilder → 执行计划
  */
 
-import { SemanticExtractor, semanticExtractor } from './semantic/SemanticExtractor';
-import { DiagnosticEngine, diagnosticEngine } from './semantic/DiagnosticEngine';
-import { SolutionBuilder, solutionBuilder } from './solutions/SolutionBuilder';
+import { semanticExtractor } from "./semantic/SemanticExtractor";
+import { diagnosticEngine } from "./semantic/DiagnosticEngine";
+import { solutionBuilder } from "./solutions/SolutionBuilder";
 import {
   SemanticExtraction,
   DiagnosticResult,
   LayeredSolution,
   AgentEvent,
   ClarificationRequest,
-} from './types';
+} from "./types";
 
 // ========== 工作流状态 ==========
 
@@ -25,14 +25,14 @@ import {
  * 工作流阶段
  */
 export type WorkflowPhase =
-  | 'idle'
-  | 'extracting'
-  | 'diagnosing'
-  | 'building_solution'
-  | 'awaiting_clarification'
-  | 'executing'
-  | 'completed'
-  | 'error';
+  | "idle"
+  | "extracting"
+  | "diagnosing"
+  | "building_solution"
+  | "awaiting_clarification"
+  | "executing"
+  | "completed"
+  | "error";
 
 /**
  * 工作流结果
@@ -77,7 +77,7 @@ export class AgentOrchestrator {
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.eventListeners = new Map();
-    this.currentPhase = 'idle';
+    this.currentPhase = "idle";
   }
 
   /**
@@ -86,18 +86,18 @@ export class AgentOrchestrator {
   async process(userInput: string, context?: Record<string, unknown>): Promise<WorkflowResult> {
     const startTime = Date.now();
     let result: WorkflowResult = {
-      phase: 'idle',
+      phase: "idle",
       timestamp: startTime,
     };
 
     try {
       // 1. 语义提取
-      this.setPhase('extracting');
-      this.emit('phase_change', { phase: 'extracting', input: userInput });
-      
+      this.setPhase("extracting");
+      this.emit("phase_change", { phase: "extracting", input: userInput });
+
       const extraction = semanticExtractor.extract(userInput, context);
       result.semanticExtraction = extraction;
-      
+
       // 检查置信度是否足够
       if (extraction.confidence < this.config.confidenceThreshold) {
         result = this.handleLowConfidence(extraction, result);
@@ -106,18 +106,18 @@ export class AgentOrchestrator {
 
       // 2. 诊断（如果需要）
       if (this.config.enableDiagnosis && this.needsDiagnosis(extraction)) {
-        this.setPhase('diagnosing');
-        this.emit('phase_change', { phase: 'diagnosing' });
-        
+        this.setPhase("diagnosing");
+        this.emit("phase_change", { phase: "diagnosing" });
+
         const diagnosis = diagnosticEngine.diagnose(userInput, context);
         result.diagnosis = diagnosis;
       }
 
       // 3. 构建解决方案
       if (this.config.enableSolutionBuilder) {
-        this.setPhase('building_solution');
-        this.emit('phase_change', { phase: 'building_solution' });
-        
+        this.setPhase("building_solution");
+        this.emit("phase_change", { phase: "building_solution" });
+
         if (result.diagnosis) {
           result.solution = solutionBuilder.buildFromDiagnosis(result.diagnosis);
         } else {
@@ -126,15 +126,14 @@ export class AgentOrchestrator {
       }
 
       // 4. 完成
-      this.setPhase('completed');
-      result.phase = 'completed';
-      this.emit('completed', { result });
-      
+      this.setPhase("completed");
+      result.phase = "completed";
+      this.emit("completed", { result });
     } catch (error) {
-      this.setPhase('error');
-      result.phase = 'error';
+      this.setPhase("error");
+      result.phase = "error";
       result.error = error instanceof Error ? error : new Error(String(error));
-      this.emit('error', { error: result.error });
+      this.emit("error", { error: result.error });
     }
 
     result.timestamp = Date.now() - startTime;
@@ -148,23 +147,23 @@ export class AgentOrchestrator {
     extraction: SemanticExtraction,
     result: WorkflowResult
   ): WorkflowResult {
-    this.setPhase('awaiting_clarification');
-    
+    this.setPhase("awaiting_clarification");
+
     const clarification: ClarificationRequest = {
-      type: 'ambiguous_intent',
-      message: '我需要更多信息来理解您的需求',
+      type: "ambiguous_intent",
+      message: "我需要更多信息来理解您的需求",
       suggestions: this.generateSuggestions(extraction),
       context: {
         detectedIntent: extraction.intent,
         confidence: extraction.confidence,
       },
     };
-    
-    result.phase = 'awaiting_clarification';
+
+    result.phase = "awaiting_clarification";
     result.clarificationNeeded = clarification;
-    
-    this.emit('clarification_needed', { clarification });
-    
+
+    this.emit("clarification_needed", { clarification });
+
     return result;
   }
 
@@ -173,25 +172,25 @@ export class AgentOrchestrator {
    */
   private generateSuggestions(extraction: SemanticExtraction): string[] {
     const suggestions: string[] = [];
-    
+
     switch (extraction.intent) {
-      case 'create_formula':
-        suggestions.push('您想创建什么类型的公式？（求和、平均、查找等）');
-        suggestions.push('请告诉我需要计算的数据范围');
+      case "create_formula":
+        suggestions.push("您想创建什么类型的公式？（求和、平均、查找等）");
+        suggestions.push("请告诉我需要计算的数据范围");
         break;
-      case 'format':
-        suggestions.push('您想设置什么格式？（颜色、字体、边框等）');
-        suggestions.push('请指定要格式化的区域');
+      case "format":
+        suggestions.push("您想设置什么格式？（颜色、字体、边框等）");
+        suggestions.push("请指定要格式化的区域");
         break;
-      case 'analyze':
-        suggestions.push('您想分析什么数据？');
-        suggestions.push('您希望得到什么类型的分析结果？');
+      case "analyze":
+        suggestions.push("您想分析什么数据？");
+        suggestions.push("您希望得到什么类型的分析结果？");
         break;
       default:
-        suggestions.push('请更详细地描述您的需求');
-        suggestions.push('您可以提供具体的数据范围或操作类型');
+        suggestions.push("请更详细地描述您的需求");
+        suggestions.push("您可以提供具体的数据范围或操作类型");
     }
-    
+
     return suggestions;
   }
 
@@ -200,17 +199,15 @@ export class AgentOrchestrator {
    */
   private needsDiagnosis(extraction: SemanticExtraction): boolean {
     // 问题排查类意图需要诊断
-    const diagnosticIntents = ['diagnose', 'debug', 'troubleshoot'];
+    const diagnosticIntents = ["diagnose", "debug", "troubleshoot"];
     if (diagnosticIntents.includes(extraction.intent)) {
       return true;
     }
-    
+
     // 包含问题关键词
-    const problemKeywords = ['错误', '不对', '失败', '问题', '为什么', '#REF', '#VALUE', '#NAME'];
-    const hasProblems = problemKeywords.some(kw => 
-      extraction.rawInput?.includes(kw)
-    );
-    
+    const problemKeywords = ["错误", "不对", "失败", "问题", "为什么", "#REF", "#VALUE", "#NAME"];
+    const hasProblems = problemKeywords.some((kw) => extraction.rawInput?.includes(kw));
+
     return hasProblems;
   }
 
@@ -258,7 +255,7 @@ export class AgentOrchestrator {
       data,
       timestamp: Date.now(),
     };
-    
+
     for (const handler of handlers) {
       try {
         handler(agentEvent);
@@ -273,44 +270,44 @@ export class AgentOrchestrator {
    */
   formatResponse(result: WorkflowResult): string {
     const lines: string[] = [];
-    
+
     // 语义理解
     if (result.semanticExtraction) {
-      lines.push('【理解您的需求】');
+      lines.push("【理解您的需求】");
       lines.push(`意图: ${result.semanticExtraction.intent}`);
       lines.push(`置信度: ${(result.semanticExtraction.confidence * 100).toFixed(0)}%`);
-      lines.push('');
+      lines.push("");
     }
-    
+
     // 诊断结果
     if (result.diagnosis) {
       lines.push(diagnosticEngine.formatDiagnosis(result.diagnosis));
-      lines.push('');
+      lines.push("");
     }
-    
+
     // 解决方案
     if (result.solution) {
       lines.push(solutionBuilder.formatSolution(result.solution));
     }
-    
+
     // 澄清请求
     if (result.clarificationNeeded) {
-      lines.push('【需要更多信息】');
+      lines.push("【需要更多信息】");
       lines.push(result.clarificationNeeded.message);
-      lines.push('');
-      lines.push('建议：');
+      lines.push("");
+      lines.push("建议：");
       result.clarificationNeeded.suggestions.forEach((s, i) => {
         lines.push(`  ${i + 1}. ${s}`);
       });
     }
-    
+
     // 错误
     if (result.error) {
-      lines.push('【发生错误】');
+      lines.push("【发生错误】");
       lines.push(result.error.message);
     }
-    
-    return lines.join('\n');
+
+    return lines.join("\n");
   }
 
   /**

@@ -299,7 +299,7 @@ class AdvancedExcelFunctionsImpl {
       detectHeaderRow?: boolean;
     }
   ): Promise<{ success: boolean; message: string }> {
-    const span = TraceContext.startSpan("beautifyTable", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("beautifyTable", SpanType.EXCEL);
     TraceContext.setSpanAttribute("range", range);
     TraceContext.setSpanAttribute("styleId", styleId);
 
@@ -403,7 +403,7 @@ class AdvancedExcelFunctionsImpl {
   async addConditionalFormat(
     rules: ConditionalFormatRule[]
   ): Promise<{ success: boolean; message: string; appliedRules: number }> {
-    const span = TraceContext.startSpan("addConditionalFormat", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("addConditionalFormat", SpanType.EXCEL);
 
     try {
       let appliedCount = 0;
@@ -474,7 +474,7 @@ class AdvancedExcelFunctionsImpl {
   async createChart(
     config: ChartConfig
   ): Promise<{ success: boolean; message: string; chartName?: string }> {
-    const span = TraceContext.startSpan("createChart", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("createChart", SpanType.EXCEL);
     TraceContext.setSpanAttribute("chartType", config.type);
 
     try {
@@ -555,7 +555,7 @@ class AdvancedExcelFunctionsImpl {
   async addDataValidation(
     rules: DataValidationRule[]
   ): Promise<{ success: boolean; message: string }> {
-    const span = TraceContext.startSpan("addDataValidation", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("addDataValidation", SpanType.EXCEL);
 
     try {
       await Excel.run(async (context) => {
@@ -563,6 +563,7 @@ class AdvancedExcelFunctionsImpl {
 
         for (const rule of rules) {
           const range = sheet.getRange(rule.range);
+          // eslint-disable-next-line office-addins/load-object-before-read, office-addins/call-sync-before-read
           const validation = range.dataValidation;
 
           // 清除现有验证
@@ -680,7 +681,7 @@ class AdvancedExcelFunctionsImpl {
   async createPivotTable(
     config: PivotTableConfig
   ): Promise<{ success: boolean; message: string; pivotTableName?: string }> {
-    const span = TraceContext.startSpan("createPivotTable", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("createPivotTable", SpanType.EXCEL);
 
     try {
       // 检查 API 支持
@@ -756,7 +757,7 @@ class AdvancedExcelFunctionsImpl {
     alternatives: string[];
     reason: string;
   }> {
-    const span = TraceContext.startSpan("recommendStyle", SpanType.EXCEL);
+    const _span = TraceContext.startSpan("recommendStyle", SpanType.EXCEL);
 
     try {
       let dataCharacteristics = {
@@ -870,7 +871,7 @@ class AdvancedExcelFunctionsImpl {
 
   private applyBorderStyle(range: Excel.Range, borderStyle: BorderStyle): void {
     const borderColor = borderStyle.color || "#000000";
-    const weight = this.mapBorderWeight(borderStyle.style);
+    const _weight = this.mapBorderWeight(borderStyle.style);
 
     const sides = borderStyle.sides || ["top", "bottom", "left", "right"];
 

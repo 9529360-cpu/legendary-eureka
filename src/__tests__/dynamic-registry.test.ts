@@ -8,11 +8,7 @@
  * - 事件通知
  */
 
-import {
-  DynamicToolRegistry,
-  ToolRegistrationOptions,
-  ToolPlugin,
-} from "../core/DynamicToolRegistry";
+import { DynamicToolRegistry, ToolPlugin } from "../core/DynamicToolRegistry";
 import { Tool, ToolResult } from "../agent/AgentCore";
 
 // 模拟工具工厂

@@ -432,7 +432,7 @@ export class SelfReflection {
    */
   validateSingleStep(
     step: ExecutionStep,
-    context?: { previousSteps?: ExecutionStep[] }
+    _context?: { previousSteps?: ExecutionStep[] }
   ): ReflectionIssue[] {
     const issues: ReflectionIssue[] = [];
 

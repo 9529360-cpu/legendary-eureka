@@ -3,6 +3,7 @@
  * @file src/taskpane/hooks/useSelection.ts
  * @description v2.9.8 管理 Excel 选区状态和数据读取
  */
+/* eslint-disable office-addins/call-sync-after-load, office-addins/call-sync-before-read */
 import * as React from "react";
 import type { SelectionResult, DataSummary, CellValue } from "../types/ui.types";
 

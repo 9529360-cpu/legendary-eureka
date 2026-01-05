@@ -143,7 +143,11 @@ export function useSelectionListener(
         await Excel.run(async (context) => {
           const workbook = context.workbook;
           // workbook.onSelectionChanged 在测试环境中可能不存在
-          if (workbook && workbook.onSelectionChanged && typeof workbook.onSelectionChanged.add === "function") {
+          if (
+            workbook &&
+            workbook.onSelectionChanged &&
+            typeof workbook.onSelectionChanged.add === "function"
+          ) {
             eventHandler = workbook.onSelectionChanged.add(handleSelectionChanged);
           }
           await context.sync();
@@ -161,7 +165,9 @@ export function useSelectionListener(
         void Excel.run(async (context) => {
           try {
             eventHandler?.remove();
-          } catch {}
+          } catch {
+            // 忽略清理时可能发生的错误
+          }
           await context.sync();
         });
       }

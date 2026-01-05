@@ -8,6 +8,8 @@
  * @packageDocumentation
  */
 
+/* eslint-disable office-addins/call-sync-after-load, office-addins/call-sync-before-read */
+
 import { Tool } from "../../types";
 import { excelRun, getTargetSheet, extractSheetName } from "./common";
 

@@ -150,7 +150,7 @@ export function useApiSettings(): UseApiSettingsReturn {
       await checkApiKeyStatus();
       // 不等待 refresh 完成，继续并行刷新状态
       void refreshBackendStatus();
-    } catch (e) {
+    } catch (_e) {
       setApiKeyStatus(null);
     }
   }, [refreshBackendStatus, checkApiKeyStatus]);

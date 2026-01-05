@@ -8,7 +8,7 @@
  * - 参数验证
  */
 
-import { ToolExecutor, ToolExecutionOptions, EnhancedToolResult } from "../core/ToolExecutor";
+import { ToolExecutor } from "../core/ToolExecutor";
 import { Tool, ToolResult } from "../agent/AgentCore";
 
 // 模拟工具

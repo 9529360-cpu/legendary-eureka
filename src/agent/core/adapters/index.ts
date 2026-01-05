@@ -10,38 +10,35 @@ export {
   MessageRole,
   ModelResponse,
   ToolCallRequest,
-} from './BaseAdapter';
+} from "./BaseAdapter";
 
-export { DeepSeekAdapter, DeepSeekConfig, createDeepSeekAdapter } from './DeepSeekAdapter';
-export { OpenAIAdapter, OpenAIConfig, createOpenAIAdapter } from './OpenAIAdapter';
-export { ClaudeAdapter, ClaudeConfig, createClaudeAdapter } from './ClaudeAdapter';
+export { DeepSeekAdapter, DeepSeekConfig, createDeepSeekAdapter } from "./DeepSeekAdapter";
+export { OpenAIAdapter, OpenAIConfig, createOpenAIAdapter } from "./OpenAIAdapter";
+export { ClaudeAdapter, ClaudeConfig, createClaudeAdapter } from "./ClaudeAdapter";
 
 // ========== 适配器工厂 ==========
 
-import { IModelAdapter, ModelConfig } from './BaseAdapter';
-import { DeepSeekAdapter } from './DeepSeekAdapter';
-import { OpenAIAdapter } from './OpenAIAdapter';
-import { ClaudeAdapter } from './ClaudeAdapter';
+import { IModelAdapter, ModelConfig } from "./BaseAdapter";
+import { DeepSeekAdapter } from "./DeepSeekAdapter";
+import { OpenAIAdapter } from "./OpenAIAdapter";
+import { ClaudeAdapter } from "./ClaudeAdapter";
 
 /**
  * 支持的模型提供商
  */
-export type ModelProvider = 'deepseek' | 'openai' | 'claude';
+export type ModelProvider = "deepseek" | "openai" | "claude";
 
 /**
  * 创建适配器
  */
-export function createAdapter(
-  provider: ModelProvider,
-  config: ModelConfig
-): IModelAdapter {
+export function createAdapter(provider: ModelProvider, config: ModelConfig): IModelAdapter {
   switch (provider) {
-    case 'deepseek':
-      return new DeepSeekAdapter(config as import('./DeepSeekAdapter').DeepSeekConfig);
-    case 'openai':
-      return new OpenAIAdapter(config as import('./OpenAIAdapter').OpenAIConfig);
-    case 'claude':
-      return new ClaudeAdapter(config as import('./ClaudeAdapter').ClaudeConfig);
+    case "deepseek":
+      return new DeepSeekAdapter(config as import("./DeepSeekAdapter").DeepSeekConfig);
+    case "openai":
+      return new OpenAIAdapter(config as import("./OpenAIAdapter").OpenAIConfig);
+    case "claude":
+      return new ClaudeAdapter(config as import("./ClaudeAdapter").ClaudeConfig);
     default:
       throw new Error(`Unsupported model provider: ${provider}`);
   }
@@ -52,17 +49,17 @@ export function createAdapter(
  */
 export function inferProvider(model: string): ModelProvider {
   const lowerModel = model.toLowerCase();
-  
-  if (lowerModel.includes('gpt') || lowerModel.includes('openai')) {
-    return 'openai';
+
+  if (lowerModel.includes("gpt") || lowerModel.includes("openai")) {
+    return "openai";
   }
-  if (lowerModel.includes('claude')) {
-    return 'claude';
+  if (lowerModel.includes("claude")) {
+    return "claude";
   }
-  if (lowerModel.includes('deepseek')) {
-    return 'deepseek';
+  if (lowerModel.includes("deepseek")) {
+    return "deepseek";
   }
-  
+
   // 默认使用 DeepSeek
-  return 'deepseek';
+  return "deepseek";
 }

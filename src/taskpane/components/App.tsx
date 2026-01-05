@@ -6,41 +6,19 @@ import {
   makeStyles,
   shorthands,
   tokens,
-  Body1,
-  Body2,
   Caption1,
-  Button,
-  Spinner,
   Toaster,
   useId,
   useToastController,
   Text,
-  Tooltip,
   ProgressBar,
-  Divider,
 } from "@fluentui/react-components";
-import {
-  SparkleRegular,
-  TableSimpleRegular,
-  MathFormulaRegular,
-  ChartMultipleRegular,
-  SettingsRegular,
-  CheckmarkCircleRegular,
-  DismissCircleRegular,
-  ArrowUndoRegular,
-  ArrowSyncRegular,
-  LightbulbRegular,
-  BroomRegular,
-  PaintBrushRegular,
-  DataBarVerticalRegular,
-  FlashRegular,
-} from "@fluentui/react-icons";
+// v2.9.8: 图标已移至各子组件，此处不再需要
 import { ErrorHandler } from "../../core/ErrorHandler";
 // v2.9.8: ApiService 调用已移至 hooks，仅保留类型导入
-import type { ChatRequest, ChatResponse, ApiKeyStatus } from "../../services/ApiService";
+import type { ApiKeyStatus } from "../../services/ApiService";
 import { DataAnalyzer } from "../../core/DataAnalyzer";
-// v2.9.8: Agent 初始化已移至 useAgent hook，仅保留类型导入
-import { AgentTask, AgentStep as AgentCoreStep } from "../../agent";
+// v2.9.8: Agent 初始化已移至 useAgent hook
 // v2.9.8: 新增组件导入
 import { ChatInputArea } from "./ChatInputArea";
 import { ApiConfigDialog } from "./ApiConfigDialog";
@@ -54,69 +32,23 @@ import type { DataSummary as InsightDataSummary, ProactiveSuggestion as InsightS
 
 // v2.9.8: 模块化重构 - 导入抽取的类型、工具函数和 hooks
 import { 
-  parseMessageContent, 
   loadUserPreferences, 
   saveUserPreferences,
   // Excel 辅助函数
   uid,
-  readSelection,
-  buildSelectionContext,
-  getCommandRangeAddress,
-  coerceCellValue,
-  normalizeHeaderList,
-  extractHeaders,
-  MAX_CONTEXT_ROWS,
-  MAX_CONTEXT_COLUMNS,
-  sliceSelectionValues,
-  // Excel 命令执行器 (v2.9.8 提取)
-  normalizeExcelCommandAction,
-  buildTabularValues,
-  getExcelCommandLabel,
-  validateAndFixCommand,
-  getActionTargetAddress,
-  convertAiResponseToCopilotResponse,
-  // v2.9.12: 数据分析纯函数
-  generateDataSummary,
-  generateProactiveSuggestions,
-  parseFormulaReferences,
-  analyzeFormulaComplexity,
 } from "../utils";
 import { useApiSettings, useAgentV4, useWorkbookContext, useSelectionListener, useUndoStack } from "../hooks";
 import type {
-  CellValue,
   CopilotAction,
-  SelectionResult,
   ChatMessage,
   DataInsight,
   OperationHistoryItem,
-  UndoStackItem,
-  ProactiveSuggestion,
-  DataSummary,
   UserPreferences,
-  OperationVerification,
-  AgentStepUI as AgentStep,
   AgentThought,
   AgentPlanUI as AgentPlan,
-  SheetInfo,
-  NamedRangeInfo,
-  TableInfo,
-  ChartInfo,
-  PivotTableInfo,
-  FormulaDependency,
-  DataRelationship,
-  WorkbookContext,
 } from "../types";
 
-type Role = "user" | "assistant";
-
-type ExcelCommand = NonNullable<ChatResponse["excelCommand"]>;
-
 // v2.9.8: 类型定义和工具函数已移至 ../types 和 ../utils
-
-interface CopilotResponse {
-  message: string;
-  actions: CopilotAction[];
-}
 
 
 
@@ -224,7 +156,7 @@ const App: React.FC = () => {
   const [previewDialogOpen, setPreviewDialogOpen] = React.useState(false);
   const [_pendingActions, setPendingActions] = React.useState<CopilotAction[]>([]);
   const [previewMessage, setPreviewMessage] = React.useState("");
-  const [requireConfirmation, _setRequireConfirmation] = React.useState(true);
+  const [_requireConfirmation, _setRequireConfirmation] = React.useState(true);
 
   // v2.9.8: API 状态现在由 useApiSettings hook 管理
   // 从 hook 解构出需要的状态（保持向后兼容的变量名）
@@ -249,7 +181,7 @@ const App: React.FC = () => {
     isScanning,
     scanProgress,
     scanWorkbook,
-    getWorkbookSummary,
+    getWorkbookSummary: _getWorkbookSummary,
   } = useWorkbookContext();
 
   // 用于 useSelectionListener 的 onSend ref（避免循环依赖）
@@ -258,10 +190,10 @@ const App: React.FC = () => {
   // v2.9.12: 使用 useUndoStack hook 管理撤销
   const {
     undoStack,
-    undoCount,
-    saveStateForUndo,
+    undoCount: _undoCount,
+    saveStateForUndo: _saveStateForUndo,
     performUndo,
-    addToUndoStack,
+    addToUndoStack: _addToUndoStack,
   } = useUndoStack({
     maxStackSize: 10,
     showToast: (message, intent) => {
@@ -312,7 +244,7 @@ const App: React.FC = () => {
   const updateAgentMessageRef = React.useRef<((step: string) => void) | null>(null);
   
   // 记录操作用于学习
-  function recordOperation(operation: string) {
+  function _recordOperation(operation: string) {
     setUserPreferences((prev) => {
       const lastUsed = prev.lastUsedOperations.filter(
         (op) => op.operation !== operation
@@ -381,9 +313,9 @@ const App: React.FC = () => {
   }
 
   /**
-   * ���ɲ���Ԥ������
+   * 生成操作预览描述
    */
-  function generatePreviewDescription(actions: CopilotAction[]): string {
+  function _generatePreviewDescription(actions: CopilotAction[]): string {
     const descriptions = actions.map((action) => {
       const label = getActionLabel(action);
       const risk = isHighRiskAction(action) ? " ??" : "";
@@ -410,9 +342,9 @@ const App: React.FC = () => {
   // v2.9.12: saveStateForUndo, performUndo, addToUndoStack 已移至 useUndoStack hook
 
   /**
-   * ��������ȷ��
+   * 请求操作确认
    */
-  async function requestOperationConfirmation(
+  async function _requestOperationConfirmation(
     actions: CopilotAction[],
     message: string
   ): Promise<boolean> {
@@ -444,7 +376,7 @@ const App: React.FC = () => {
   /**
    * 添加 Agent 思维记录（UI 展示用）
    */
-  function addAgentThought(type: AgentThought["type"], content: string) {
+  function _addAgentThought(type: AgentThought["type"], content: string) {
     const thought: AgentThought = {
       id: uid(),
       type,
@@ -458,7 +390,7 @@ const App: React.FC = () => {
   /**
    * 实时更新 Agent 消息（流式显示思考过程）
    */
-  function updateAgentMessage(step: string) {
+  function _updateAgentMessage(step: string) {
     const msgId = currentAgentMsgIdRef.current;
     if (!msgId) return;
     

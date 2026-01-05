@@ -1,13 +1,13 @@
 /**
  * BaseAdapter - 基础模型适配器
- * 
+ *
  * 单一职责：定义模型适配器的抽象接口
  * 行数上限：200 行
- * 
+ *
  * 所有模型适配器必须实现此接口，确保模型无关性
  */
 
-import { ToolContract } from '../contracts/ToolContract';
+import { ToolContract } from "../contracts/ToolContract";
 
 // ========== 适配器接口 ==========
 
@@ -26,7 +26,7 @@ export interface ModelConfig {
 /**
  * 消息角色
  */
-export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
+export type MessageRole = "system" | "user" | "assistant" | "tool";
 
 /**
  * 聊天消息
@@ -53,7 +53,7 @@ export interface ToolCallRequest {
 export interface ModelResponse {
   content: string;
   toolCalls?: ToolCallRequest[];
-  finishReason: 'stop' | 'tool_calls' | 'length' | 'error';
+  finishReason: "stop" | "tool_calls" | "length" | "error";
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -126,18 +126,13 @@ export abstract class BaseAdapter implements IModelAdapter {
   /**
    * 发送 HTTP 请求
    */
-  protected async fetchApi(
-    endpoint: string,
-    body: Record<string, unknown>
-  ): Promise<unknown> {
-    const url = this.config.baseUrl
-      ? `${this.config.baseUrl}${endpoint}`
-      : endpoint;
+  protected async fetchApi(endpoint: string, body: Record<string, unknown>): Promise<unknown> {
+    const url = this.config.baseUrl ? `${this.config.baseUrl}${endpoint}` : endpoint;
 
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${this.config.apiKey}`,
       },
       body: JSON.stringify(body),
@@ -156,18 +151,18 @@ export abstract class BaseAdapter implements IModelAdapter {
    */
   protected withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
     const timeout = timeoutMs || this.config.timeout || 30000;
-    
+
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Request timeout after ${timeout}ms`));
       }, timeout);
 
       promise
-        .then(result => {
+        .then((result) => {
           clearTimeout(timer);
           resolve(result);
         })
-        .catch(error => {
+        .catch((error) => {
           clearTimeout(timer);
           reject(error);
         });

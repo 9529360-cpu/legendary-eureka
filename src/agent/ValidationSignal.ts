@@ -16,7 +16,7 @@
  * - 把选择权交给 Agent 和用户，而非代码硬编码
  */
 
-import { ValidationCheckResult, HardValidationRule } from "./AgentCore";
+import { ValidationCheckResult } from "./AgentCore";
 
 // ========== 类型定义 ==========
 

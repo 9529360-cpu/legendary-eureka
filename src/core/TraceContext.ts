@@ -592,8 +592,10 @@ class TraceContextClass {
 
     const durations = traces.map((t) => t.totalDuration || 0).filter((d) => d > 0);
 
-    const successCount = traces.filter((t) =>
-      t.response?.success === true || (t.response?.success === undefined && t.rootSpan.status !== SpanStatus.ERROR)
+    const successCount = traces.filter(
+      (t) =>
+        t.response?.success === true ||
+        (t.response?.success === undefined && t.rootSpan.status !== SpanStatus.ERROR)
     ).length;
     const spanTypes: Record<string, number> = {};
 
@@ -772,23 +774,6 @@ class TraceContextClass {
       this.traceHistory.find((t) => t.traceId === traceId) || this.activeTraces.get(traceId);
     if (!trace) return JSON.stringify({});
 
-    const flatten = (span: Span): any => {
-      return {
-        name: span.operationName,
-        type: span.type,
-        status: span.status,
-        duration: span.duration,
-        error: span.error ? (span.error as any).message || span.error : undefined,
-        events: span.events.map((e) => ({
-          name: e.name,
-          timestamp: e.timestamp,
-          attributes: e.attributes,
-        })),
-        children: span.children.map(flatten),
-      };
-    };
-
-
     try {
       // flatten to array: root + descendants
       const collected: any[] = [];
@@ -799,7 +784,11 @@ class TraceContextClass {
           status: s.status,
           duration: s.duration,
           error: typeof s.error === "string" ? s.error : (s.error as any)?.message,
-          events: s.events.map((e) => ({ name: e.name, timestamp: e.timestamp, attributes: e.attributes })),
+          events: s.events.map((e) => ({
+            name: e.name,
+            timestamp: e.timestamp,
+            attributes: e.attributes,
+          })),
         });
         s.children.forEach(collect);
       };
@@ -815,7 +804,7 @@ class TraceContextClass {
         spans: collected,
       };
       return JSON.stringify(obj);
-    } catch (e) {
+    } catch (_e) {
       return JSON.stringify({ name: trace.rootSpan.operationName, traceId: trace.traceId });
     }
   }
@@ -846,13 +835,29 @@ class TraceContextClass {
     const events: any[] = [];
     const collect = (span: Span) => {
       // start event
-      events.push({ span: span.operationName, name: "start", timestamp: span.startTime, attributes: {} });
+      events.push({
+        span: span.operationName,
+        name: "start",
+        timestamp: span.startTime,
+        attributes: {},
+      });
       // span events
       span.events.forEach((e) =>
-        events.push({ span: span.operationName, name: e.name, timestamp: e.timestamp, attributes: e.attributes })
+        events.push({
+          span: span.operationName,
+          name: e.name,
+          timestamp: e.timestamp,
+          attributes: e.attributes,
+        })
       );
       // end event
-      if (span.endTime) events.push({ span: span.operationName, name: "end", timestamp: span.endTime, attributes: {} });
+      if (span.endTime)
+        events.push({
+          span: span.operationName,
+          name: "end",
+          timestamp: span.endTime,
+          attributes: {},
+        });
       span.children.forEach(collect);
     };
 
@@ -915,7 +920,11 @@ class TraceContextClass {
 
     // 顶级错误字段兼容旧测试
     if (trace.response?.error) augmented.error = trace.response.error;
-    else if (trace.rootSpan.error) augmented.error = typeof trace.rootSpan.error === "string" ? trace.rootSpan.error : (trace.rootSpan.error as any).message;
+    else if (trace.rootSpan.error)
+      augmented.error =
+        typeof trace.rootSpan.error === "string"
+          ? trace.rootSpan.error
+          : (trace.rootSpan.error as any).message;
 
     return augmented;
   }

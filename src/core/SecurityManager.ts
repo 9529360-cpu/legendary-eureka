@@ -171,7 +171,7 @@ const DANGEROUS_PATTERNS = [
   /('|")\s*(or|and)\s*('|")/gi,
   /;\s*(drop|delete|truncate|update)\s+/gi,
   // 路径遍历
-  /\.\.[\/\\]/g,
+  /\.\.[/\\]/g,
 ];
 
 // ============ SecurityManager 类 ============
@@ -567,6 +567,7 @@ class SecurityManagerImpl {
       .replace(/'/g, "&#039;");
 
     // 移除控制字符
+    // eslint-disable-next-line no-control-regex
     sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, "");
 
     // 限制长度

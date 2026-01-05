@@ -15,7 +15,6 @@
 
 import {
   IntentSpec,
-  IntentType,
   CreateTableSpec,
   WriteDataSpec,
   FormatSpec,
@@ -95,7 +94,8 @@ export class SpecCompiler {
     if (compressedIntent) {
       console.log("[SpecCompiler] 压缩意图:", compressedIntent);
       // 为不同压缩意图设置执行策略标志（后续步骤可读取）
-      (context as Record<string, unknown>).__routingHint = this.getRoutingHintForCompressedIntent(compressedIntent);
+      (context as Record<string, unknown>).__routingHint =
+        this.getRoutingHintForCompressedIntent(compressedIntent);
     }
 
     // 如果需要澄清，直接返回澄清步骤
@@ -165,7 +165,7 @@ export class SpecCompiler {
   /**
    * 编译创建表格
    */
-  private compileCreateTable(spec: CreateTableSpec, context: CompileContext): CompileResult {
+  private compileCreateTable(spec: CreateTableSpec, _context: CompileContext): CompileResult {
     const steps: PlanStep[] = [];
 
     // 步骤1: 读取当前选区（感知）
@@ -445,7 +445,7 @@ export class SpecCompiler {
   /**
    * 编译图表
    */
-  private compileChart(spec: ChartSpec, context: CompileContext): CompileResult {
+  private compileChart(spec: ChartSpec, _context: CompileContext): CompileResult {
     const steps: PlanStep[] = [];
 
     // 步骤1: 创建图表
@@ -493,7 +493,7 @@ export class SpecCompiler {
   /**
    * 编译工作表操作
    */
-  private compileSheet(spec: SheetSpec, context: CompileContext): CompileResult {
+  private compileSheet(spec: SheetSpec, _context: CompileContext): CompileResult {
     const steps: PlanStep[] = [];
 
     if (spec.operation === "create") {
@@ -887,48 +887,48 @@ export class SpecCompiler {
    */
   private getRoutingHintForCompressedIntent(compressedIntent: string): RoutingHint {
     switch (compressedIntent) {
-      case 'failure':
+      case "failure":
         // 失败类：优先执行诊断/检查步骤
         return {
-          priority: 'diagnose',
+          priority: "diagnose",
           addDiagnosticStep: true,
-          suggestedTools: ['excel_read_selection', 'excel_analyze_data'],
-          message: '检测到可能的错误/失败情况，优先执行诊断',
+          suggestedTools: ["excel_read_selection", "excel_analyze_data"],
+          message: "检测到可能的错误/失败情况，优先执行诊断",
         };
 
-      case 'automation':
+      case "automation":
         // 自动化类：优先执行批量/扩展操作
         return {
-          priority: 'batch',
+          priority: "batch",
           addDiagnosticStep: false,
-          suggestedTools: ['excel_fill_formula', 'excel_smart_formula'],
-          message: '检测到自动化需求，优先考虑批量操作',
+          suggestedTools: ["excel_fill_formula", "excel_smart_formula"],
+          message: "检测到自动化需求，优先考虑批量操作",
         };
 
-      case 'structure':
+      case "structure":
         // 结构类：建议重构/拆分步骤
         return {
-          priority: 'refactor',
+          priority: "refactor",
           addDiagnosticStep: true,
-          suggestedTools: ['excel_create_sheet', 'excel_named_range'],
-          message: '检测到结构问题，建议拆分或重构',
+          suggestedTools: ["excel_create_sheet", "excel_named_range"],
+          message: "检测到结构问题，建议拆分或重构",
         };
 
-      case 'maintainability':
+      case "maintainability":
         // 可维护性类：添加保护/验证步骤
         return {
-          priority: 'protect',
+          priority: "protect",
           addDiagnosticStep: false,
-          suggestedTools: ['excel_protect_sheet', 'excel_add_data_validation'],
-          message: '检测到维护性关注，考虑添加保护措施',
+          suggestedTools: ["excel_protect_sheet", "excel_add_data_validation"],
+          message: "检测到维护性关注，考虑添加保护措施",
         };
 
       default:
         return {
-          priority: 'default',
+          priority: "default",
           addDiagnosticStep: false,
           suggestedTools: [],
-          message: '',
+          message: "",
         };
     }
   }
@@ -938,7 +938,7 @@ export class SpecCompiler {
  * 路由提示接口
  */
 export interface RoutingHint {
-  priority: 'diagnose' | 'batch' | 'refactor' | 'protect' | 'default';
+  priority: "diagnose" | "batch" | "refactor" | "protect" | "default";
   addDiagnosticStep: boolean;
   suggestedTools: string[];
   message: string;
