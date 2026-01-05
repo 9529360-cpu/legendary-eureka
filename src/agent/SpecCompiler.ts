@@ -89,6 +89,15 @@ export class SpecCompiler {
   compile(spec: IntentSpec, context: CompileContext = {}): CompileResult {
     console.log("[SpecCompiler] 编译意图:", spec.intent);
 
+    // ========== 基于 compressedIntent 的路由策略 ==========
+    // 这是 v4.0.1 新增的语义驱动路由原型
+    const compressedIntent = spec.compressedIntent;
+    if (compressedIntent) {
+      console.log("[SpecCompiler] 压缩意图:", compressedIntent);
+      // 为不同压缩意图设置执行策略标志（后续步骤可读取）
+      (context as Record<string, unknown>).__routingHint = this.getRoutingHintForCompressedIntent(compressedIntent);
+    }
+
     // 如果需要澄清，直接返回澄清步骤
     if (spec.needsClarification) {
       return this.compileClarify(spec);
@@ -866,6 +875,73 @@ export class SpecCompiler {
       fieldStepIdMap: {},
     };
   }
+
+  // ========== 语义驱动路由 ==========
+
+  /**
+   * 根据 compressedIntent 返回路由提示
+   * 这些提示可在后续步骤生成中用于调整策略
+   *
+   * @param compressedIntent 压缩意图 (automation|failure|structure|maintainability)
+   * @returns 路由提示对象
+   */
+  private getRoutingHintForCompressedIntent(compressedIntent: string): RoutingHint {
+    switch (compressedIntent) {
+      case 'failure':
+        // 失败类：优先执行诊断/检查步骤
+        return {
+          priority: 'diagnose',
+          addDiagnosticStep: true,
+          suggestedTools: ['excel_read_selection', 'excel_analyze_data'],
+          message: '检测到可能的错误/失败情况，优先执行诊断',
+        };
+
+      case 'automation':
+        // 自动化类：优先执行批量/扩展操作
+        return {
+          priority: 'batch',
+          addDiagnosticStep: false,
+          suggestedTools: ['excel_fill_formula', 'excel_smart_formula'],
+          message: '检测到自动化需求，优先考虑批量操作',
+        };
+
+      case 'structure':
+        // 结构类：建议重构/拆分步骤
+        return {
+          priority: 'refactor',
+          addDiagnosticStep: true,
+          suggestedTools: ['excel_create_sheet', 'excel_named_range'],
+          message: '检测到结构问题，建议拆分或重构',
+        };
+
+      case 'maintainability':
+        // 可维护性类：添加保护/验证步骤
+        return {
+          priority: 'protect',
+          addDiagnosticStep: false,
+          suggestedTools: ['excel_protect_sheet', 'excel_add_data_validation'],
+          message: '检测到维护性关注，考虑添加保护措施',
+        };
+
+      default:
+        return {
+          priority: 'default',
+          addDiagnosticStep: false,
+          suggestedTools: [],
+          message: '',
+        };
+    }
+  }
+}
+
+/**
+ * 路由提示接口
+ */
+export interface RoutingHint {
+  priority: 'diagnose' | 'batch' | 'refactor' | 'protect' | 'default';
+  addDiagnosticStep: boolean;
+  suggestedTools: string[];
+  message: string;
 }
 
 // ========== 单例导出 ==========

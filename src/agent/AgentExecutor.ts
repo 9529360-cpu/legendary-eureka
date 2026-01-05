@@ -113,10 +113,9 @@ export class AgentExecutor {
       console.log("[AgentExecutor] Step 1: 解析意图...");
       const intentSpec = await this.intentParser.parse(context);
 
+      // 只发布 intent 对象，避免额外暴露置信度或内部语义原子给 UI
       this.emit("intent:parsed", {
-        intent: intentSpec, // 发送完整的 IntentSpec 对象
-        confidence: intentSpec.confidence,
-        needsClarification: intentSpec.needsClarification,
+        intent: intentSpec,
       });
 
       console.log("[AgentExecutor] 意图:", intentSpec.intent, "置信度:", intentSpec.confidence);

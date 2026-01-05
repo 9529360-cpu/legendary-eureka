@@ -179,10 +179,15 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
         console.log("[AgentV4] 意图解析完成:", intent.intent);
       }
 
+      // 去掉可能的语义原子字段，避免 UI 展示内部原子
+      const safeIntent = { ...intent } as IntentSpec;
+      delete (safeIntent as any).semanticAtoms;
+      delete (safeIntent as any).compressedIntent;
+
       setState((prev) => ({
         ...prev,
         status: "compiling",
-        intent,
+        intent: safeIntent,
         progress: {
           phase: "compiling",
           totalSteps: 0,
@@ -192,10 +197,7 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
         },
       }));
 
-      addLog(
-        "think",
-        `意图识别: ${intent.intent} (置信度: ${(intent.confidence * 100).toFixed(0)}%)`
-      );
+      addLog("think", `意图识别: ${intent.intent}`);
       onEventRef.current?.("intent:parsed", data);
     });
 
