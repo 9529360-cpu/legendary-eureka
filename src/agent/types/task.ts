@@ -6,9 +6,7 @@
 
 import type { DataModel } from "../DataModeler";
 import type { ExecutionError, SampleValidationResult } from "../FormulaValidator";
-import type { ExecutionPlan } from "../TaskPlanner";
-import type { ReplanResult } from "../TaskPlanner";
-import type { ToolResult } from "./tool";
+import type { ExecutionPlan, ReplanResult } from "../TaskPlanner";
 import type {
   HardValidationRule,
   ValidationCheckResult,
