@@ -9,6 +9,9 @@
 import type { FriendlyError, RetryStrategy, SelfHealingAction, InteractionConfig } from "../types";
 import type { ExpertAgentConfig } from "../types/config";
 
+// 重新导出类型
+export type { ExpertAgentConfig } from "../types/config";
+
 // ========== 错误映射常量 ==========
 
 /**

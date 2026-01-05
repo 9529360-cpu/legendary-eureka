@@ -81,7 +81,7 @@ import {
   parseFormulaReferences,
   analyzeFormulaComplexity,
 } from "../utils";
-import { useApiSettings, useAgent, useWorkbookContext, useSelectionListener, useUndoStack } from "../hooks";
+import { useApiSettings, useAgentV4, useWorkbookContext, useSelectionListener, useUndoStack } from "../hooks";
 import type {
   CellValue,
   CopilotAction,
@@ -187,8 +187,8 @@ const App: React.FC = () => {
   // v2.9.8: 使用 useApiSettings hook 管理后端连接和 API 密钥
   const apiSettings = useApiSettings();
   // v2.9.9: legacyChat 已删除，所有请求统一走 Agent
-  // v2.9.8: 使用 useAgent hook 管理 Agent 初始化和调用
-  const agent = useAgent({
+  // v4.0: 使用 useAgentV4 hook 管理 Agent 初始化和调用（新架构）
+  const agent = useAgentV4({
     maxIterations: 30,
     enableMemory: true,
     verboseLogging: true,
@@ -534,121 +534,7 @@ const App: React.FC = () => {
     const t = text.trim();
     if (!t || busy) return;
 
-    // v2.9.17: 检查是否是对计划的确认/取消
-    const agentInstance = agent.agentInstance;
-    if (agentInstance) {
-      const pendingPlan = agentInstance.getPendingPlanConfirmation();
-      if (pendingPlan) {
-        const lowerT = t.toLowerCase();
-        // v2.9.45: 扩展确认模式 - 添加"是的"、"是"、"对"、"没问题"等常用确认词
-        const confirmPatterns = [
-          "可以", "就这样", "确认", "执行", "好的", "行", "ok", "yes", "开始",
-          "是的", "是", "对", "对的", "没问题", "嗯", "好", "干", "搞", "做", "修复", "处理", "检查"
-        ];
-        const cancelPatterns = ["取消", "不要", "算了", "cancel", "no", "不", "别", "停"];
-        // v2.9.17: 调整请求模式
-        const adjustPatterns = ["调整", "修改", "改成", "列名", "表名", "从", "跳过", "添加列", "加一列"];
-        
-        const isConfirm = confirmPatterns.some(p => lowerT.includes(p));
-        const isCancel = cancelPatterns.some(p => lowerT.includes(p));
-        const isAdjust = adjustPatterns.some(p => lowerT.includes(p));
-        
-        if (isConfirm || isCancel || isAdjust) {
-          const userMessage: ChatMessage = {
-            id: uid(),
-            role: "user",
-            text: t,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, userMessage]);
-          setInput("");
-          setBusy(true);
-          
-          if (isCancel) {
-            await agentInstance.confirmAndExecutePlan(false);
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: uid(),
-                role: "assistant",
-                text: "好的，已取消该任务。有其他需要帮忙的吗？",
-                timestamp: new Date(),
-              },
-            ]);
-          } else if (isAdjust && !isConfirm) {
-            // v2.9.17: 解析用户的调整请求
-            const adjustments = agentInstance.parsePlanAdjustmentRequest(t);
-            if (adjustments && Object.keys(adjustments).length > 0) {
-              // 应用调整并执行
-              const executingMsgId = uid();
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: executingMsgId,
-                  role: "assistant",
-                  text: "✅ 已应用调整，正在执行...",
-                  timestamp: new Date(),
-                },
-              ]);
-              
-              const result = await agentInstance.confirmAndExecutePlan(true, adjustments);
-              
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === executingMsgId
-                    ? { ...msg, text: result?.result || "执行完成！" }
-                    : msg
-                )
-              );
-            } else {
-              // 未能解析调整请求
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: uid(),
-                  role: "assistant",
-                  text: "请告诉我你想如何调整，例如：\n• 「列名改成 名称, 数量, 价格」\n• 「从 A5 开始」\n• 「表名叫 销售数据」\n• 「跳过第 2 步」",
-                  timestamp: new Date(),
-                },
-              ]);
-            }
-          } else {
-            // 显示执行中状态
-            const executingMsgId = uid();
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: executingMsgId,
-                role: "assistant",
-                text: "✅ 计划已确认，正在执行...",
-                timestamp: new Date(),
-              },
-            ]);
-            
-            const result = await agentInstance.confirmAndExecutePlan(true);
-            
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === executingMsgId
-                  ? { ...msg, text: result?.result || "执行完成！" }
-                  : msg
-              )
-            );
-          }
-          
-          setBusy(false);
-          return;
-        }
-      }
-
-      // v2.9.74: 移除关键词检测机制
-      // 所有用户输入都作为普通请求发送，让 LLM 通过对话历史理解上下文
-      // 例如用户说"好的开始吧"，LLM 会看到之前的对话，自然理解这是确认
-      // 清除旧的跟进上下文（如果有的话）
-      if (agentInstance.getPendingFollowUpContext()) {
-        agentInstance.clearPendingFollowUpContext();
-      }
-    }
+    // v4.0: 简化逻辑，所有请求直接发送给新架构的 Agent
 
     const userMessage: ChatMessage = {
       id: uid(),
@@ -738,99 +624,18 @@ const App: React.FC = () => {
         // v2.9.8: 设置 useAgent hook 的步骤回调
         agent.setStepCallback(updateAgentMessageRef.current);
         
-        const agentInstance = agent.agentInstance;
-        if (!agentInstance) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === thinkingMsgId
-                ? { ...msg, text: "抱歉，我暂时无法处理这个任务。请刷新页面后重试。" }
-                : msg
-            )
-          );
-          setBusy(false);
-          setIsAgentRunning(false);
-          return;
-        }
-        
+        // v4.0: 使用新架构的 send() 方法
         try {
-          // 构建环境状态（包括工作簿上下文）
-          const environmentState: Record<string, unknown> = {
-            environment: "excel",
-            timestamp: new Date().toISOString(),
-          };
-          
-          // 添加工作簿上下文（如果已扫描）
-          if (workbookContext) {
-            environmentState.workbook = {
-              fileName: workbookContext.fileName,
-              sheets: workbookContext.sheets.map(s => ({
-                name: s.name,
-                usedRangeAddress: s.usedRangeAddress,
-                rowCount: s.rowCount,
-                columnCount: s.columnCount,
-                hasData: s.rowCount > 0 && s.columnCount > 0,
-              })),
-              tables: workbookContext.tables.map(t => ({
-                name: t.name,
-                sheetName: t.sheetName,
-                address: t.address,
-                rowCount: t.rowCount,
-                columns: t.columns,
-              })),
-              charts: workbookContext.charts.map(c => ({
-                name: c.name,
-                sheetName: c.sheetName,
-                type: c.chartType,
-              })),
-              namedRanges: workbookContext.namedRanges.map(n => ({
-                name: n.name,
-                address: n.address,
-              })),
-              totalCellsWithData: workbookContext.totalCellsWithData,
-              totalFormulas: workbookContext.totalFormulas,
-              qualityScore: workbookContext.overallQualityScore,
-              lastScanned: workbookContext.lastScanned.toISOString(),
-            };
-          }
-          
-          // v2.9.14: 构建对话历史，让 Agent 知道之前在讨论什么
-          // 只保留最近 10 轮对话，避免 token 过多
-          const conversationHistory = messages
-            .filter(msg => msg.role === "user" || (msg.role === "assistant" && !msg.text.includes("正在思考")))
-            .slice(-20) // 最近 20 条消息（约 10 轮对话）
-            .map(msg => ({
-              role: msg.role as "user" | "assistant",
-              content: msg.text.substring(0, 500), // 每条消息限制 500 字符
-            }));
-          
-          // v2.9.8: 使用 agentInstance 替代 agent（变量名冲突）
-          const agentTask: AgentTask = await agentInstance.run(t, {
-            environment: "excel",
-            environmentState,
-            conversationHistory, // v2.9.14: 传入对话历史
+          // v4.0: 直接调用 agent.send()，传入上下文
+          const result = await agent.send(t, {
+            activeSheet: workbookContext?.sheets?.[0]?.name,
+            workbookName: workbookContext?.fileName,
           });
           
-          // v2.9.17: 检查是否是等待确认的计划
-          if (agentTask.status === "pending") {
-            // Agent 返回了需要确认的计划
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === thinkingMsgId
-                  ? { ...msg, text: agentTask.result || "请确认以下计划" }
-                  : msg
-              )
-            );
-            setBusy(false);
-            setIsAgentRunning(false);
-            return;
-          }
-          
-          // 从 Agent 结果中构建用户消息
+          // v4.0: 处理执行结果
           const agentResult = {
-            success: agentTask.status === "completed",
-            message: agentTask.result || "任务完成",
-            steps: agentTask.steps,
-            thoughts: [] as AgentThought[], // 思维链通过事件收集
+            success: result.success,
+            message: result.message || (result.success ? "任务完成" : result.error || "执行失败"),
           };
         
         // v2.9.26: 重构消息展示 - 只显示 Agent 的核心回复，像人一样说话

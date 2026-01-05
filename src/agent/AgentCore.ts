@@ -150,7 +150,7 @@ import {
   DEFAULT_TIMEOUT,
   DEFAULT_WORKBOOK_CACHE_TTL,
 } from "./constants";
-import type { ExpertAgentType } from "./constants";
+// 注意: ExpertAgentType 在本文件中定义 (line ~960)，不从 constants 导入
 
 // ========== 工具注册（从 registry 模块导入） ==========
 import { ToolRegistry } from "./registry";
@@ -954,27 +954,11 @@ export interface ProactiveSuggestion {
   userResponse?: "accepted" | "rejected" | "ignored";
 }
 
-/**
- * v2.9.21: 专家 Agent 类型
- */
-export type ExpertAgentType =
-  | "data_analyst"
-  | "formatter"
-  | "formula_expert"
-  | "chart_expert"
-  | "general";
-
-/**
- * v2.9.21: 专家 Agent 配置
- */
-export interface ExpertAgentConfig {
-  type: ExpertAgentType;
-  name: string;
-  description: string;
-  specialties: string[];
-  tools: string[];
-  systemPromptAddition: string;
-}
+// v2.9.21: 专家 Agent 类型和配置已迁移到 constants/index.ts
+// 为了向后兼容，从 constants 重新导出
+import type { ExpertAgentType, ExpertAgentConfig as _ExpertAgentConfig } from "./constants";
+export type { ExpertAgentType };
+export type ExpertAgentConfig = _ExpertAgentConfig;
 
 /**
  * v2.9.21: 任务分配结果
@@ -8476,6 +8460,7 @@ ${expandedDataStr}
    *
    * 当主工具失败时，尝试用替代工具完成任务
    * v2.9.43: 返回降级详情，必须通知用户
+   * v4.0.1: 修复 excel_write_range 降级问题 - 循环写入所有单元格
    */
   private async executeWithFallback(
     step: PlanStep,
@@ -8501,6 +8486,26 @@ ${expandedDataStr}
       console.log(`[Agent]  尝试降级到工具: ${fallbackName}`);
 
       try {
+        // v4.0.1: 特殊处理 excel_write_range -> excel_write_cell 降级
+        // 不能只写第一个单元格，必须循环写入所有单元格
+        if (step.action === "excel_write_range" && fallbackName === "excel_write_cell") {
+          const multiWriteResult = await this.executeMultiCellWrite(step.parameters, fallbackTool);
+          if (multiWriteResult.success) {
+            console.log(`[Agent]  多单元格降级写入成功`);
+            return {
+              success: true,
+              result: multiWriteResult,
+              usedFallback: true,
+              fallbackInfo: {
+                originalTool: step.action,
+                fallbackTool: fallbackName,
+                semanticChange: "从批量写入降级为逐单元格写入",
+              },
+            };
+          }
+          continue;
+        }
+
         // 适配参数（不同工具可能需要不同参数格式）
         const adaptedParams = this.adaptParamsForTool(step.parameters, step.action, fallbackName);
 
@@ -8531,12 +8536,114 @@ ${expandedDataStr}
   }
 
   /**
+   * v4.0.1: 多单元格降级写入
+   * 当 excel_write_range 失败时，使用 excel_write_cell 逐个写入每个单元格
+   */
+  private async executeMultiCellWrite(
+    params: Record<string, unknown>,
+    writeCellTool: Tool
+  ): Promise<ToolResult> {
+    const baseAddress = (params.address || params.range || "A1") as string;
+    const values = params.values as unknown[][];
+    const sheetName = params.sheet as string | undefined;
+
+    if (!values || !Array.isArray(values) || values.length === 0) {
+      return { success: false, output: "没有要写入的数据", error: "No values to write" };
+    }
+
+    // 解析起始地址
+    const startCell = baseAddress.split(":")[0]; // 取 A1:G1 中的 A1
+    const colMatch = startCell.match(/^([A-Z]+)/i);
+    const rowMatch = startCell.match(/(\d+)$/);
+    
+    if (!colMatch || !rowMatch) {
+      return { success: false, output: "地址格式无效", error: "Invalid address format" };
+    }
+
+    const startCol = colMatch[1].toUpperCase();
+    const startRow = parseInt(rowMatch[1], 10);
+
+    // 列名转数字 (A=0, B=1, ...)
+    const colToNum = (col: string): number => {
+      let num = 0;
+      for (let i = 0; i < col.length; i++) {
+        num = num * 26 + (col.charCodeAt(i) - 64);
+      }
+      return num - 1;
+    };
+
+    // 数字转列名
+    const numToCol = (num: number): string => {
+      let col = "";
+      num++; // 1-indexed
+      while (num > 0) {
+        num--;
+        col = String.fromCharCode(65 + (num % 26)) + col;
+        num = Math.floor(num / 26);
+      }
+      return col;
+    };
+
+    const startColNum = colToNum(startCol);
+    const writtenCells: string[] = [];
+    let failedCells = 0;
+
+    // 逐个写入每个单元格
+    for (let rowIdx = 0; rowIdx < values.length; rowIdx++) {
+      const row = values[rowIdx];
+      if (!Array.isArray(row)) continue;
+
+      for (let colIdx = 0; colIdx < row.length; colIdx++) {
+        const value = row[colIdx];
+        if (value === null || value === undefined || value === "") continue;
+
+        const cellCol = numToCol(startColNum + colIdx);
+        const cellRow = startRow + rowIdx;
+        const cellAddress = `${cellCol}${cellRow}`;
+
+        try {
+          const cellParams: Record<string, unknown> = {
+            address: cellAddress,
+            value: String(value),
+          };
+          if (sheetName) {
+            cellParams.sheet = sheetName;
+          }
+
+          const result = await writeCellTool.execute(cellParams);
+          if (result.success) {
+            writtenCells.push(cellAddress);
+          } else {
+            failedCells++;
+            console.warn(`[Agent]  写入单元格 ${cellAddress} 失败: ${result.error}`);
+          }
+        } catch (err) {
+          failedCells++;
+          console.warn(`[Agent]  写入单元格 ${cellAddress} 异常: ${err}`);
+        }
+      }
+    }
+
+    if (writtenCells.length === 0) {
+      return { success: false, output: "所有单元格写入失败", error: "All cells failed" };
+    }
+
+    const summary = `已写入 ${writtenCells.length} 个单元格${failedCells > 0 ? ` (${failedCells} 个失败)` : ""}`;
+    return {
+      success: true,
+      output: summary,
+      data: { writtenCells, failedCells },
+    };
+  }
+
+  /**
    * v2.9.43: 描述降级带来的语义变化
+   * v4.0.1: 更新描述，现在支持多单元格写入
    */
   private describeSemanticChange(originalTool: string, fallbackTool: string): string {
     const changes: Record<string, Record<string, string>> = {
       excel_write_range: {
-        excel_write_cell: "从批量写入降级为单元格写入，只写入了第一个单元格",
+        excel_write_cell: "从批量写入降级为逐单元格写入",
       },
       excel_read_range: {
         excel_read_selection: "从指定范围读取降级为读取当前选区，数据范围可能不同",

@@ -95,7 +95,13 @@ export interface PlanStep {
     | "format"
     | "verify"
     | "read_data"
-    | "analyze";
+    | "analyze"
+    // v4.0 新增 phase
+    | "sensing"    // 感知阶段（读取当前状态）
+    | "response"   // 响应阶段（回复用户）
+    | "chart"      // 图表阶段
+    | "sheet"      // 工作表操作阶段
+    | "execution"; // 通用执行阶段
   description: string;
 
   // 具体操作

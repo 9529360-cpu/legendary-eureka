@@ -548,3 +548,34 @@ export function getExcelAgent(): Agent {
   }
   return excelAgent;
 }
+
+// ========== v4.0 新架构 ==========
+
+// IntentParser - 意图解析器（Layer 1）
+export { IntentParser, intentParser } from "./IntentParser";
+export type { ParseContext } from "./IntentParser";
+
+// SpecCompiler - 规格编译器（Layer 2）
+export { SpecCompiler, specCompiler } from "./SpecCompiler";
+export type { SpecCompileContext, SpecCompileResult } from "./SpecCompiler";
+
+// AgentExecutor - 执行引擎（Layer 3）
+export { AgentExecutor, createAgentExecutor } from "./AgentExecutor";
+export type { AgentExecutionResult, StepResult, ExecutorEvent, ExecutorEventType } from "./AgentExecutor";
+
+// 意图类型
+export type {
+  IntentSpec,
+  IntentSpecData,
+  CreateTableSpec,
+  WriteDataSpec,
+  FormatSpec,
+  FormulaSpec,
+  ChartSpec,
+  SheetSpec,
+  DataOperationSpec,
+  QuerySpec,
+  ClarifySpec,
+  RespondSpec,
+  ColumnDefinition,
+} from "./types/intent";

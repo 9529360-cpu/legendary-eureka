@@ -108,8 +108,7 @@ export type {
   PlanStep,
   ExecutionPlan,
   PlanExecutionResult,
-  TaskProgress,
-  ProgressStep,
+  // TaskProgress 和 ProgressStep 已从 task.ts 导出
   AgentStreamData,
   AgentOutputData,
   AgentStreamStructuredOutputData,
@@ -119,3 +118,21 @@ export type {
   TaskPendingEventData,
   PlanGeneratedEventData,
 } from "./workflow";
+
+// ========== 意图相关类型 (v4.0) ==========
+export type {
+  IntentType,
+  IntentSpec,
+  IntentSpecData,
+  CreateTableSpec,
+  WriteDataSpec,
+  FormatSpec,
+  FormulaSpec,
+  ChartSpec,
+  SheetSpec,
+  DataOperationSpec,
+  QuerySpec,
+  ClarifySpec,
+  RespondSpec,
+  ColumnDefinition,
+} from "./intent";

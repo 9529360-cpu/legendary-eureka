@@ -205,6 +205,8 @@ export type ExpertAgentType =
  * v2.9.21: 专家 Agent 配置
  */
 export interface ExpertAgentConfig {
+  /** Agent 类型标识 */
+  type: string;
   /** Agent 名称 */
   name: string;
   /** Agent 描述 */
@@ -213,6 +215,6 @@ export interface ExpertAgentConfig {
   specialties: string[];
   /** 可使用的工具 */
   tools: string[];
-  /** 系统提示词 */
-  systemPrompt: string;
+  /** 系统提示词补充 */
+  systemPromptAddition: string;
 }
