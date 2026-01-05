@@ -1,8 +1,22 @@
 # Excel 智能助手 Add-in 架构治理方案
 
 > 📅 创建日期: 2026-01-05  
-> 📌 版本: v1.0  
+> 📌 版本: v1.1 (已执行 Phase 1-4)  
 > 🎯 目标: 将 13,771 行的 AgentCore.ts 拆分为模块化架构
+> 
+> ## ✅ 执行进度 (2026-01-05)
+> 
+> | Phase | 状态 | Git Tag | 说明 |
+> |-------|------|---------|------|
+> | Phase 1 | ✅ 完成 | `refactor-phase-1-types` | 类型抽取到 `types/` |
+> | Phase 2 | ✅ 完成 | `refactor-phase-2-workflow` | 工作流抽取到 `workflow/` |
+> | Phase 3 | ✅ 完成 | `refactor-phase-3-constants` | 常量抽取到 `constants/` |
+> | Phase 4 | ✅ 完成 | `refactor-phase-4-registry` | ToolRegistry 抽取到 `registry/` |
+> | Phase 5-6 | 📋 延迟 | - | AgentMemory 与 Agent 耦合较深 |
+> | Phase 7 | 📋 待执行 | - | ExcelAdapter 拆分 |
+> | Phase 8 | 📋 待执行 | - | 清理和文档 |
+> 
+> **成果**: AgentCore.ts 从 **16,965 行 → 13,118 行** (减少 **3,847 行, 23%**)
 
 ---
 
