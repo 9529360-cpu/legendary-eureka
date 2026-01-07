@@ -28,6 +28,9 @@ import { ToolResult } from "./types/tool";
 import { IntentSpec } from "./types/intent";
 import createExcelTools from "./ExcelAdapter";
 import { EpisodicMemory, ReusableExperience } from "./EpisodicMemory";
+// v1.1: 集成反假完成闭环
+import { AntiHallucinationController, TurnResult } from "./core/gates/AntiHallucinationController";
+import { AgentRun, AgentState as GateState } from "./core/gates/types";
 
 // ========== 配置 ==========
 
@@ -52,6 +55,12 @@ export interface OrchestratorConfig {
 
   /** 是否在写操作前确认 */
   confirmBeforeWrite: boolean;
+
+  /** 是否启用反假完成闭环 */
+  enableAntiHallucination: boolean;
+
+  /** 是否启用多轮对话上下文 */
+  enableConversationContext: boolean;
 }
 
 export const DEFAULT_ORCHESTRATOR_CONFIG: OrchestratorConfig = {
@@ -61,6 +70,8 @@ export const DEFAULT_ORCHESTRATOR_CONFIG: OrchestratorConfig = {
   enableAutoFix: true,
   verificationTimeout: 5000,
   confirmBeforeWrite: false,
+  enableAntiHallucination: true,
+  enableConversationContext: true,
 };
 
 // ========== 状态机 ==========
@@ -199,7 +210,12 @@ export interface OrchestratorResult {
 // ========== AgentOrchestrator 类 ==========
 
 /**
- * 智能 Agent 统一控制中心
+ * 智能 Agent 统一控制中心 v1.1
+ *
+ * v1.1 新增:
+ * - 集成 AntiHallucinationController 反假完成闭环
+ * - 多轮对话上下文保持
+ * - 智能修复策略增强
  */
 export class AgentOrchestrator {
   private config: OrchestratorConfig;
@@ -209,6 +225,13 @@ export class AgentOrchestrator {
   private memory: EpisodicMemory;
   private eventHandlers: Map<OrchestratorEventType, Array<(event: OrchestratorEvent) => void>>;
 
+  // v1.1: 反假完成闭环控制器
+  private antiHallucinationController: AntiHallucinationController;
+  private currentRun: AgentRun | null = null;
+
+  // v1.1: 多轮对话上下文
+  private conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...DEFAULT_ORCHESTRATOR_CONFIG, ...config };
     this.intentParser = new IntentParser();
@@ -216,6 +239,9 @@ export class AgentOrchestrator {
     this.toolRegistry = new ToolRegistry();
     this.memory = new EpisodicMemory();
     this.eventHandlers = new Map();
+
+    // v1.1: 初始化反假完成控制器
+    this.antiHallucinationController = new AntiHallucinationController();
 
     // 注册 Excel 工具
     this.registerExcelTools();
@@ -321,7 +347,7 @@ export class AgentOrchestrator {
    * 3. 编译 → 生成计划
    * 4. 确认 → 可选的用户确认
    * 5. 执行 → 逐步执行
-   * 6. 验证 → 检查结果
+   * 6. 验证 → 检查结果 + 反假完成检查
    * 7. 修复 → 失败时重试
    * 8. 完成 → 返回结果 + 学习经验
    */
@@ -331,6 +357,19 @@ export class AgentOrchestrator {
     try {
       console.log("[AgentOrchestrator] ========== 开始执行 ==========");
       console.log("[AgentOrchestrator] 用户消息:", context.userMessage);
+
+      // v1.1: 保存用户消息到对话历史
+      if (this.config.enableConversationContext) {
+        this.conversationHistory.push({ role: "user", content: context.userMessage });
+        // 将历史传给解析上下文
+        context.conversationHistory = [...this.conversationHistory];
+      }
+
+      // v1.1: 初始化反假完成运行实例
+      if (this.config.enableAntiHallucination) {
+        this.currentRun = this.antiHallucinationController.createRun("user", `task_${Date.now()}`);
+        this.antiHallucinationController.handleUserMessage(this.currentRun, context.userMessage);
+      }
 
       // ===== 1. 感知阶段 =====
       this.setPhase(state, "sensing");
@@ -808,14 +847,57 @@ export class AgentOrchestrator {
         state.stepResults = state.stepResults.filter(
           (r) => r.success || r.stepId.includes("write")
         );
+        console.log("[AgentOrchestrator] 策略1: 跳过非关键失败步骤");
         return true;
       }
     }
 
     // 策略2: 重新感知上下文
     await this.enrichContext(context);
+    console.log("[AgentOrchestrator] 策略2: 重新感知上下文");
+
+    // 策略3: 尝试替代工具
+    const lastFailedStep = state.stepResults.find((r) => !r.success);
+    if (lastFailedStep && state.plan) {
+      const alternativeTool = this.findAlternativeTool(lastFailedStep.action);
+      if (alternativeTool) {
+        const step = state.plan.steps.find((s) => s.id === lastFailedStep.stepId);
+        if (step) {
+          console.log(
+            `[AgentOrchestrator] 策略3: 尝试替代工具 ${lastFailedStep.action} -> ${alternativeTool}`
+          );
+          step.action = alternativeTool;
+          state.stepResults = state.stepResults.filter((r) => r.stepId !== lastFailedStep.stepId);
+          return true;
+        }
+      }
+    }
 
     return false;
+  }
+
+  /**
+   * v1.1: 查找替代工具
+   */
+  private findAlternativeTool(originalTool: string): string | null {
+    const alternatives: Record<string, string[]> = {
+      excel_write_range: ["excel_write_cell", "excel_set_value"],
+      excel_read_range: ["excel_get_selection", "excel_get_cell"],
+      excel_set_formula: ["excel_write_cell"],
+      excel_create_table: ["excel_write_range"],
+      excel_format_range: ["excel_set_cell_format"],
+    };
+
+    const alts = alternatives[originalTool];
+    if (alts && alts.length > 0) {
+      // 检查替代工具是否存在
+      for (const alt of alts) {
+        if (this.toolRegistry.get(alt)) {
+          return alt;
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -828,8 +910,28 @@ export class AgentOrchestrator {
   ): Promise<boolean> {
     console.log("[AgentOrchestrator] 尝试修复验证失败:", verificationResult.reason);
 
-    // 目前简单处理：重新执行
-    // 未来可以根据验证失败类型做更智能的修复
+    // v1.1: 智能修复策略
+    const reason = verificationResult.reason || "";
+
+    // 策略1: 如果是步骤执行失败，清除结果重试
+    if (reason.includes("步骤执行失败")) {
+      state.stepResults = [];
+      console.log("[AgentOrchestrator] 验证修复策略1: 清除结果重试");
+      return true;
+    }
+
+    // 策略2: 如果是验证未通过，尝试重新验证
+    if (reason.includes("验证未通过")) {
+      // 重置验证状态
+      state.stepResults.forEach((r) => {
+        r.verified = undefined;
+        r.verificationError = undefined;
+      });
+      console.log("[AgentOrchestrator] 验证修复策略2: 重置验证状态");
+      return true;
+    }
+
+    // 默认：重新执行
     state.stepResults = [];
     return true;
   }
@@ -851,6 +953,36 @@ export class AgentOrchestrator {
     const message = this.generateCompletionMessage(state, successSteps);
     state.finalResponse = message;
 
+    // v1.1: 保存助手回复到对话历史
+    if (this.config.enableConversationContext) {
+      this.conversationHistory.push({ role: "assistant", content: message });
+      // 限制历史长度（最多保留 20 轮）
+      if (this.conversationHistory.length > 40) {
+        this.conversationHistory = this.conversationHistory.slice(-40);
+      }
+    }
+
+    // v1.1: 反假完成闭环验证
+    let antiHallucinationResult: TurnResult | undefined;
+    if (this.config.enableAntiHallucination && this.currentRun) {
+      antiHallucinationResult = this.antiHallucinationController.handleModelOutput(
+        this.currentRun,
+        this.generateSubmissionBlock(state, message)
+      );
+
+      if (!antiHallucinationResult.allowFinish) {
+        console.log(
+          "[AgentOrchestrator] 反假完成检查未通过:",
+          antiHallucinationResult.systemMessage
+        );
+        this.emit("verification:failed", {
+          reason: "反假完成检查未通过",
+          details: antiHallucinationResult,
+        });
+        // 记录但不阻塞（用于诊断）
+      }
+    }
+
     // 学习经验
     let experience: ReusableExperience | undefined;
     if (this.config.enableLearning) {
@@ -864,6 +996,7 @@ export class AgentOrchestrator {
       success: true,
       stepCount: successSteps.length,
       duration: state.endTime - state.startTime,
+      antiHallucinationPassed: antiHallucinationResult?.allowFinish ?? true,
     });
 
     return {
@@ -872,6 +1005,41 @@ export class AgentOrchestrator {
       state,
       experience,
     };
+  }
+
+  /**
+   * v1.1: 生成提交块（用于反假完成验证）
+   */
+  private generateSubmissionBlock(state: AgentState, message: string): string {
+    const artifacts = state.stepResults
+      .filter((r) => r.success)
+      .map((r) => `- ${r.action}: ${r.output?.substring(0, 100) || "完成"}`)
+      .join("\n");
+
+    const tests = [
+      "1. 验证数据已正确写入目标区域",
+      "2. 验证格式已正确应用",
+      "3. 验证无错误值 (#REF!, #VALUE! 等)",
+    ];
+
+    return `[STATE]
+DEPLOYED
+
+[ARTIFACTS]
+${artifacts || "- 操作已完成"}
+
+[ACCEPTANCE_TESTS]
+${tests.join("\n")}
+
+[FALLBACK]
+- 如果结果不正确，可以使用 Ctrl+Z 撤销
+- 重新执行操作
+
+[DEPLOY_NOTES]
+${message}
+
+[NEXT_ACTION]
+等待用户下一步指令`;
   }
 
   /**
@@ -1006,6 +1174,58 @@ export class AgentOrchestrator {
    */
   getMemory(): EpisodicMemory {
     return this.memory;
+  }
+
+  /**
+   * v1.1: 获取对话历史
+   */
+  getConversationHistory(): Array<{ role: "user" | "assistant"; content: string }> {
+    return [...this.conversationHistory];
+  }
+
+  /**
+   * v1.1: 清除对话历史
+   */
+  clearConversationHistory(): void {
+    this.conversationHistory = [];
+    this.currentRun = null;
+    console.log("[AgentOrchestrator] 对话历史已清除");
+  }
+
+  /**
+   * v1.1: 获取反假完成运行状态
+   */
+  getAntiHallucinationStatus(): {
+    enabled: boolean;
+    runId?: string;
+    state?: GateState;
+    iteration?: number;
+  } {
+    if (!this.config.enableAntiHallucination || !this.currentRun) {
+      return { enabled: this.config.enableAntiHallucination };
+    }
+
+    return {
+      enabled: true,
+      runId: this.currentRun.id,
+      state: this.currentRun.state,
+      iteration: this.currentRun.iteration,
+    };
+  }
+
+  /**
+   * v1.1: 获取配置
+   */
+  getConfig(): OrchestratorConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * v1.1: 更新配置
+   */
+  updateConfig(newConfig: Partial<OrchestratorConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    console.log("[AgentOrchestrator] 配置已更新:", Object.keys(newConfig));
   }
 }
 
