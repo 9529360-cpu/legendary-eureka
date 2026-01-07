@@ -62,3 +62,9 @@ button,
 ::-webkit-scrollbar-thumb {
   border-radius: 3px;
 }
+
+/* Scroll anchor for auto-scroll to bottom */
+.scroll-anchor {
+  height: 1px;
+  visibility: hidden;
+}

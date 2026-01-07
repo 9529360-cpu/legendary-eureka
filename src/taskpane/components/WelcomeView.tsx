@@ -147,14 +147,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       <div className={styles.welcomeTitle}>Excel 智能助手</div>
       <div className={styles.welcomeSubtitle}>选中数据区域，告诉我你想做什么</div>
 
-      {/* 兼容旧测试文件中的编码损坏文字（有时测试文件含有乱码匹配） */}
-      <div style={{ display: "none" }}>
-        Excel �������� 智能助手
-      </div>
-      <div style={{ display: "none" }}>
-        Excel ��������
-      </div>
-
       <div className={styles.quickActionsGrid}>
         {actions.map((action) => (
           <button

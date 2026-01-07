@@ -109,7 +109,7 @@ describe("App Component", () => {
     // 等待组件渲染完成
     await waitFor(
       () => {
-        const welcomeText = screen.getByText(/Excel �������� 智能助手/i);
+        const welcomeText = screen.getByText(/Excel 智能助手/i);
         expect(welcomeText).toBeInTheDocument();
       },
       { timeout: 5000 }
@@ -124,7 +124,7 @@ describe("App Component", () => {
     // 等待组件渲染完成
     await waitFor(
       () => {
-        const title = screen.getByText("Excel ��������");
+        const title = screen.getByText("Excel 智能助手");
         expect(title).toBeInTheDocument();
       },
       { timeout: 5000 }

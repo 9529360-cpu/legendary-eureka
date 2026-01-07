@@ -279,20 +279,20 @@ export function createMyNewTool(): Tool {
 
 | 文件 | 用途 |
 |---|---|
-| [src/agent/IntentParser.ts](src/agent/IntentParser.ts) | v4.0 意图解析器，LLM 无工具名 |
-| [src/agent/SpecCompiler.ts](src/agent/SpecCompiler.ts) | v4.0 规格编译器，纯规则零 Token |
-| [src/agent/AgentExecutor.ts](src/agent/AgentExecutor.ts) | v4.0 执行引擎 |
-| [src/agent/AgentCore.ts](src/agent/AgentCore.ts) | ReAct Agent 核心（旧版兼容） |
-| [src/agent/ExcelAdapter.ts](src/agent/ExcelAdapter.ts) | Excel 工具入口，兼容层 |
-| [src/agent/types/](src/agent/types/) | Agent 类型定义 (Tool, ToolResult, AgentTask 等) |
-| [src/agent/workflow/](src/agent/workflow/) | 工作流引擎 (WorkflowEngine) |
-| [src/agent/registry/](src/agent/registry/) | 工具注册中心 |
-| [src/agent/tools/excel/](src/agent/tools/excel/) | 分类 Excel 工具 (61个工具) |
-| [src/taskpane/hooks/useAgent.ts](src/taskpane/hooks/useAgent.ts) | UI 调用 Agent 的 hook (旧版) |
-| [src/taskpane/hooks/useAgentV4.ts](src/taskpane/hooks/useAgentV4.ts) | UI 调用 Agent 的 hook (v4.0) |
-| [src/services/ApiService.ts](src/services/ApiService.ts) | AI 后端 API 调用 |
-| [ai-backend.cjs](ai-backend.cjs) | Express 后端，对接 DeepSeek API |
-| [manifest.xml](manifest.xml) | Office Add-in 清单 |
+| `src/agent/IntentParser.ts` | v4.0 意图解析器，LLM 无工具名 |
+| `src/agent/SpecCompiler.ts` | v4.0 规格编译器，纯规则零 Token |
+| `src/agent/AgentExecutor.ts` | v4.0 执行引擎 |
+| `src/agent/AgentCore.ts` | ReAct Agent 核心（旧版兼容） |
+| `src/agent/ExcelAdapter.ts` | Excel 工具入口，兼容层 |
+| `src/agent/types/` | Agent 类型定义 (Tool, ToolResult, AgentTask 等) |
+| `src/agent/workflow/` | 工作流引擎 (WorkflowEngine) |
+| `src/agent/registry/` | 工具注册中心 |
+| `src/agent/tools/excel/` | 分类 Excel 工具 (61个工具) |
+| `src/taskpane/hooks/useAgent.ts` | UI 调用 Agent 的 hook (旧版) |
+| `src/taskpane/hooks/useAgentV4.ts` | UI 调用 Agent 的 hook (v4.0) |
+| `src/services/ApiService.ts` | AI 后端 API 调用 |
+| `ai-backend.cjs` | Express 后端，对接 DeepSeek API |
+| `manifest.xml` | Office Add-in 清单 |
 
 ## AI 后端
 
@@ -332,7 +332,7 @@ node scripts/clean_encoding.cjs <file>
 node scripts/fix_encoding.js  # 专门修复 App.tsx
 ```
 
-详细说明见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+详细说明见 `docs/TROUBLESHOOTING.md`
 
 ## 调试技巧
 

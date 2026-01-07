@@ -275,7 +275,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       )}
       
       {/* v2.9.25: 滚动锚点 - 用于自动滚动到最新消息 */}
-      <div ref={messagesEndRef} style={{ height: 1 }} />
+      <div ref={messagesEndRef} className="scroll-anchor" />
     </div>
   );
 };
