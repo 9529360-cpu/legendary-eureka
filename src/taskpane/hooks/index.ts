@@ -38,3 +38,7 @@ export * from "./useSelection";
 export * from "./useWorkbookContext";
 export * from "./useSelectionListener";
 export * from "./useUndoStack";
+
+// v4.3: 主动洞察型 Agent Hook
+export { useProactiveAgent } from "./useProactiveAgent";
+export type { UseProactiveAgentOptions, UseProactiveAgentReturn } from "./useProactiveAgent";

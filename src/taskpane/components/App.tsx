@@ -37,7 +37,7 @@ import {
   // Excel 辅助函数
   uid,
 } from "../utils";
-import { useApiSettings, useAgentV4, useWorkbookContext, useSelectionListener, useUndoStack } from "../hooks";
+import { useApiSettings, useAgentV4, useWorkbookContext, useSelectionListener, useUndoStack, useProactiveAgent } from "../hooks";
 import type {
   CopilotAction,
   ChatMessage,
@@ -104,6 +104,51 @@ const useStyles = makeStyles({
   agentProgressText: {
     whiteSpace: "nowrap",
   },
+  
+  // v4.3: 主动洞察快速操作区域
+  proactiveActionsWrapper: {
+    ...shorthands.padding("8px", "16px"),
+    display: "flex",
+    flexWrap: "wrap",
+    ...shorthands.gap("8px"),
+    ...shorthands.borderBottom("1px", "solid", tokens.colorNeutralStroke2),
+  },
+  proactiveActionsTitle: {
+    width: "100%",
+    marginBottom: "4px",
+  },
+  proactiveActionButton: {
+    ...shorthands.padding("4px", "12px"),
+    fontSize: "12px",
+    ...shorthands.borderRadius("16px"),
+    ...shorthands.border("1px", "solid", tokens.colorBrandStroke1),
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorBrandForeground1,
+    cursor: "pointer",
+    "&:hover": {
+      backgroundColor: tokens.colorBrandBackground2,
+    },
+    "&:disabled": {
+      opacity: 0.5,
+      cursor: "not-allowed",
+    },
+  },
+  proactiveExecuteAllButton: {
+    ...shorthands.padding("4px", "12px"),
+    fontSize: "12px",
+    ...shorthands.borderRadius("16px"),
+    ...shorthands.border("1px", "solid", tokens.colorPaletteGreenBorder1),
+    backgroundColor: tokens.colorPaletteGreenBackground1,
+    color: tokens.colorPaletteGreenForeground1,
+    cursor: "pointer",
+    "&:hover": {
+      backgroundColor: tokens.colorPaletteGreenBackground2,
+    },
+    "&:disabled": {
+      opacity: 0.5,
+      cursor: "not-allowed",
+    },
+  },
 });
 
 // v2.9.9: applyExcelCommand 和 applyAction 已删除
@@ -123,6 +168,13 @@ const App: React.FC = () => {
   const agent = useAgentV4({
     maxIterations: 30,
     enableMemory: true,
+    verboseLogging: true,
+  });
+
+  // v4.3: 主动洞察型 Agent - 观察 → 判断 → 建议 → 确认
+  const proactiveAgent = useProactiveAgent({
+    autoAnalyzeOnStart: true,
+    autoAnalyzeOnSheetChange: true,
     verboseLogging: true,
   });
 
@@ -261,6 +313,55 @@ const App: React.FC = () => {
   React.useEffect(() => {
     void bootstrapBackendStatus();
   }, []);
+
+  // v4.3: 主动洞察 Agent 消息同步
+  // 当 proactiveAgent 产生新消息时，添加到聊天列表
+  React.useEffect(() => {
+    const latestMessage = proactiveAgent.latestMessage;
+    if (latestMessage) {
+      // 只添加 agent 类型的消息（洞察和建议）
+      if (latestMessage.type === "insight" || latestMessage.type === "suggestion") {
+        setMessages((prev) => {
+          // 避免重复添加
+          const alreadyExists = prev.some((m) => m.id === latestMessage.id);
+          if (alreadyExists) return prev;
+          
+          return [
+            ...prev,
+            {
+              id: latestMessage.id,
+              role: "assistant" as const,
+              text: latestMessage.content,
+              timestamp: latestMessage.timestamp,
+            },
+          ];
+        });
+      }
+    }
+  }, [proactiveAgent.latestMessage]);
+
+  // v4.3: 当有新的洞察报告时显示
+  React.useEffect(() => {
+    if (proactiveAgent.insights && proactiveAgent.insights.narrativeDescription) {
+      // 检查是否已经显示过这个洞察
+      const insightId = `insight-${Date.now()}`;
+      setMessages((prev) => {
+        // 如果最后一条消息已经是洞察消息，不重复添加
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg?.text === proactiveAgent.insights?.narrativeDescription) return prev;
+        
+        return [
+          ...prev,
+          {
+            id: insightId,
+            role: "assistant" as const,
+            text: proactiveAgent.insights!.narrativeDescription,
+            timestamp: new Date(),
+          },
+        ];
+      });
+    }
+  }, [proactiveAgent.insights?.narrativeDescription]);
 
   // v2.9.12: 选区监听已移至 useSelectionListener hook
   // v2.9.12: handleSelectionChanged 和 performProactiveAnalysis 已移至 useSelectionListener hook
@@ -780,6 +881,16 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* v4.3: 主动洞察 Agent 分析进度 */}
+        {proactiveAgent.isAnalyzing && (
+          <div className={styles.agentProgressWrapper}>
+            <ProgressBar className={styles.agentProgressBar} />
+            <Caption1 className={styles.agentProgressText}>
+              🔍 正在分析工作表...
+            </Caption1>
+          </div>
+        )}
+
         {/* v2.9.17: Agent 执行进度显示 */}
         {isAgentRunning && agent.state.progress && (
           <div className={styles.agentProgressWrapper}>
@@ -801,6 +912,38 @@ const App: React.FC = () => {
             selectionAddress={lastSelection?.address}
             suggestions={insightSuggestions}
           />
+        )}
+
+        {/* ===== v4.3: 主动洞察快速操作 ===== */}
+        {proactiveAgent.quickActions.length > 0 && (
+          <div className={styles.proactiveActionsWrapper}>
+            <Caption1 className={styles.proactiveActionsTitle}>
+              💡 根据分析，你可能想要：
+            </Caption1>
+            {proactiveAgent.quickActions.slice(0, 4).map((action, index) => (
+              <button
+                key={index}
+                onClick={async () => {
+                  await proactiveAgent.sendMessage(action.action);
+                }}
+                disabled={busy || proactiveAgent.isExecuting}
+                className={styles.proactiveActionButton}
+              >
+                {action.label}
+              </button>
+            ))}
+            {proactiveAgent.suggestions.length > 0 && (
+              <button
+                onClick={async () => {
+                  await proactiveAgent.executeAll();
+                }}
+                disabled={busy || proactiveAgent.isExecuting}
+                className={styles.proactiveExecuteAllButton}
+              >
+                ✓ 全部执行
+              </button>
+            )}
+          </div>
         )}
 
         {/* ===== 聊天区域 ===== */}
