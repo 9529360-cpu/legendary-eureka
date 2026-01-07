@@ -611,6 +611,49 @@ export type {
   TracerConfig,
 } from "./tracing";
 
+// ParallelExecutor - 并行执行引擎
+export {
+  ParallelExecutor,
+  createParallelExecutor,
+  buildDAG,
+  detectCycle,
+  getReadyNodes,
+} from "./ParallelExecutor";
+export type {
+  DAGNode,
+  NodeStatus,
+  StepExecutionResult,
+  ParallelExecutionResult,
+  ExecutionEvent,
+  ParallelExecutionOptions,
+} from "./ParallelExecutor";
+
+// ToolDiscovery - 工具动态发现器
+export {
+  ToolDiscovery,
+  createToolDiscovery,
+} from "./ToolDiscovery";
+export type {
+  SemanticTag,
+  ToolMetadata as DiscoveryToolMetadata,
+  IntentAtom,
+  ToolMatch,
+  DiscoveryOptions,
+} from "./ToolDiscovery";
+
+// PersistentMemory - 持久化内存层
+export {
+  PersistentMemory,
+  createPersistentMemory,
+} from "./memory";
+export type {
+  StoredMessage,
+  StoredEpisode,
+  ToolStats as PersistentToolStats,
+  SessionSummary,
+  PersistentMemoryConfig,
+} from "./memory";
+
 // 意图类型
 export type {
   IntentSpec,

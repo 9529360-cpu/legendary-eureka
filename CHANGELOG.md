@@ -1,5 +1,99 @@
 ﻿# Excel 智能助手 更新日志
 
+## [4.2.0] - 2026-01-07
+
+### 🚀 v4.2 Agent 能力升级 - Phase 2: 并行执行与智能发现
+
+> 继续基于 Microsoft Copilot 对比分析，实现 Phase 2 核心能力
+
+---
+
+#### 🆕 新增核心组件
+
+**ParallelExecutor (并行执行引擎)**
+- 文件: `src/agent/ParallelExecutor.ts`
+- 特点:
+  - DAG（有向无环图）依赖分析
+  - 拓扑排序确定执行顺序
+  - 独立步骤并行执行（Promise.all）
+  - 可配置最大并发数
+  - 失败传播与隔离（跳过依赖失败的步骤）
+  - 事件回调追踪进度
+
+**ToolDiscovery (工具动态发现器)**
+- 文件: `src/agent/ToolDiscovery.ts`
+- 特点:
+  - 语义标签索引（动作词 + 实体词）
+  - 中英文同义词映射
+  - 意图原子匹配算法
+  - 工具推荐排序（分数 0-1）
+  - 使用统计加权
+  - 按分类过滤
+
+**PersistentMemory (持久化内存层)**
+- 文件: `src/agent/memory/PersistentMemory.ts`
+- 特点:
+  - 基于 IndexedDB 存储
+  - 对话历史持久化
+  - 经验记忆存储（成功/失败模式）
+  - 工具统计持久化
+  - 会话摘要管理
+  - 自动过期清理
+  - 数据导入/导出
+
+---
+
+#### 📊 并行执行统计
+
+执行结果包含详细统计：
+```typescript
+interface ParallelExecutionResult {
+  success: boolean;
+  totalSteps: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  totalDuration: number;
+  parallelism: {
+    maxConcurrent: number;
+    avgConcurrent: number;
+    batches: number;
+  };
+}
+```
+
+---
+
+#### 🔍 工具发现 API
+
+```typescript
+// 基于意图发现工具
+const matches = discovery.discover({
+  action: "读取",
+  entity: "单元格",
+});
+
+// 基于关键词搜索
+const tools = discovery.search("排序数据");
+
+// 更新使用统计
+discovery.updateStats("excel_read_range", true, 100);
+```
+
+---
+
+#### 🧪 测试覆盖
+
+新增 28 个测试用例：
+- ParallelExecutor: 12 个测试
+- ToolDiscovery: 11 个测试
+- PersistentMemory Types: 4 个测试
+- Phase 2 Integration: 1 个测试
+
+总测试数: 419 个（全部通过）
+
+---
+
 ## [4.1.0] - 2026-01-07
 
 ### 🚀 v4.1 Agent 能力升级 - 流式输出与错误恢复
