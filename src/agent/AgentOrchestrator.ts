@@ -380,7 +380,7 @@ export class AgentOrchestrator {
       if (similarExperiences.length > 0) {
         console.log(
           "[AgentOrchestrator] 找到相似经验:",
-          similarExperiences.map((e) => e.taskDescription)
+          similarExperiences.map((e) => e.userRequest)
         );
       }
 
@@ -418,21 +418,24 @@ export class AgentOrchestrator {
           }
         }
 
-        if (!compileResult.success) {
+        if (!compileResult.success || !compileResult.plan) {
           return this.createFailureResult(state, compileResult.error || "无法生成执行计划");
         }
       }
 
-      state.plan = compileResult.plan;
+      // 此时 plan 确保存在
+      const plan = compileResult.plan;
+
+      state.plan = plan;
       this.emit("plan:compiled", {
-        stepCount: compileResult.plan.steps.length,
-        description: compileResult.plan.taskDescription,
+        stepCount: plan.steps.length,
+        description: plan.taskDescription,
       });
 
       // ===== 4. 确认阶段（可选） =====
-      if (this.config.confirmBeforeWrite && this.hasWriteOperations(compileResult.plan)) {
+      if (this.config.confirmBeforeWrite && this.hasWriteOperations(plan)) {
         this.setPhase(state, "confirming");
-        return this.createConfirmationResult(state, compileResult.plan);
+        return this.createConfirmationResult(state, plan);
       }
 
       // ===== 5-7. 执行-验证-修复 循环 =====
@@ -516,7 +519,8 @@ export class AgentOrchestrator {
       const simpleSpec = { ...simplifiedSpec.spec } as Record<string, unknown>;
       delete simpleSpec.format;
       delete simpleSpec.validation;
-      simplifiedSpec.spec = simpleSpec as IntentSpec["spec"];
+      // 使用 unknown 作为中间类型进行安全转换
+      simplifiedSpec.spec = simpleSpec as unknown as IntentSpec["spec"];
     }
 
     const result = this.specCompiler.compile(simplifiedSpec, context);
@@ -986,8 +990,9 @@ export class AgentOrchestrator {
     // 学习经验
     let experience: ReusableExperience | undefined;
     if (this.config.enableLearning) {
-      experience = this.learnFromExecution(state, context);
-      if (experience) {
+      const learned = this.learnFromExecution(state, context);
+      if (learned) {
+        experience = learned;
         this.emit("experience:saved", { experience });
       }
     }
@@ -1080,32 +1085,59 @@ ${message}
 
   /**
    * 学习经验
+   *
+   * 使用 EpisodicMemory 的正确 API：
+   * - startEpisode(): 开始记录情景
+   * - recordStep(): 记录每个步骤
+   * - endEpisode(): 结束并提取经验
    */
   private learnFromExecution(state: AgentState, context: ParseContext): ReusableExperience | null {
     if (!state.plan || state.errors.length > 0) {
       return null;
     }
 
-    const experience: ReusableExperience = {
-      id: `exp_${Date.now()}`,
-      taskDescription: context.userMessage,
-      steps: state.plan.steps.map((step) => ({
-        action: step.action,
-        description: step.description,
-        parameters: step.parameters,
-      })),
-      successRate: state.stepResults.filter((r) => r.success).length / state.stepResults.length,
-      usageCount: 1,
-      lastUsed: Date.now(),
-      createdAt: Date.now(),
-    };
-
     try {
-      this.memory.save(experience);
-      console.log("[AgentOrchestrator] 保存经验:", experience.id);
-      return experience;
+      // 开始一个新的情景记录
+      // Episode.context 只支持: sheetName, range, dataSize
+      const episodeId = this.memory.startEpisode(context.userMessage, {
+        sheetName: context.activeSheet,
+        range: context.selection?.address,
+        dataSize: context.selection?.rowCount,
+      });
+
+      // 记录每个执行步骤
+      // EpisodeStep 需要: toolName, parameters, result, duration, error?, outputSummary?
+      for (let i = 0; i < state.stepResults.length; i++) {
+        const result = state.stepResults[i];
+        const step = state.plan.steps[i];
+
+        if (step && result) {
+          this.memory.recordStep({
+            toolName: step.action,
+            parameters: step.parameters,
+            result: result.success ? "success" : "failure",
+            duration: 0, // 暂无精确时长
+            error: result.error,
+            outputSummary: result.output?.substring(0, 100),
+          });
+        }
+      }
+
+      // 结束情景并提取经验
+      const episode = this.memory.endEpisode([
+        `成功执行: ${state.stepResults.filter((r) => r.success).length}/${state.stepResults.length} 步骤`,
+      ]);
+
+      if (episode) {
+        const experiences = this.memory.extractReusableExperience(episode);
+        console.log(`[AgentOrchestrator] 保存经验: ${episodeId}, 提取 ${experiences.length} 条`);
+        return experiences[0] || null;
+      }
+
+      return null;
     } catch (error) {
       console.warn("[AgentOrchestrator] 保存经验失败:", error);
+      this.memory.abandonEpisode();
       return null;
     }
   }
@@ -1207,7 +1239,7 @@ ${message}
 
     return {
       enabled: true,
-      runId: this.currentRun.id,
+      runId: this.currentRun.runId,
       state: this.currentRun.state,
       iteration: this.currentRun.iteration,
     };
