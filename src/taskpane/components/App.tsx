@@ -617,6 +617,27 @@ const App: React.FC = () => {
       // ===== 统一 Agent 模式：所有请求都走这里 =====
       console.log("[App] 使用统一 Agent 模式处理请求");
       
+      // v4.3: 检测是否是简单的公式指令（如 K2=E2-F2-J2-J2）
+      const formulaMatch = t.match(/^([A-Z]+\d+)\s*=\s*(.+)$/i);
+      if (formulaMatch) {
+        // 简单的公式指令，直接通过 proactiveAgent 处理
+        console.log("[App] 检测到公式指令，使用 proactiveAgent 处理");
+        const result = await proactiveAgent.sendMessage(t);
+        
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "assistant",
+            text: result,
+            timestamp: new Date(),
+          },
+        ]);
+        
+        setBusy(false);
+        return;
+      }
+      
       // 显示更自然的思考状态
         const thinkingMsgId = uid();
         setMessages((prev) => [
@@ -924,7 +945,31 @@ const App: React.FC = () => {
               <button
                 key={index}
                 onClick={async () => {
-                  await proactiveAgent.sendMessage(action.action);
+                  setBusy(true);
+                  try {
+                    const result = await proactiveAgent.sendMessage(action.action);
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: uid(),
+                        role: "assistant",
+                        text: result,
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } catch (error) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: uid(),
+                        role: "assistant",
+                        text: `❌ ${error instanceof Error ? error.message : "执行失败"}`,
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
                 disabled={busy || proactiveAgent.isExecuting}
                 className={styles.proactiveActionButton}
@@ -935,7 +980,31 @@ const App: React.FC = () => {
             {proactiveAgent.suggestions.length > 0 && (
               <button
                 onClick={async () => {
-                  await proactiveAgent.executeAll();
+                  setBusy(true);
+                  try {
+                    const result = await proactiveAgent.executeAll();
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: uid(),
+                        role: "assistant",
+                        text: result,
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } catch (error) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: uid(),
+                        role: "assistant",
+                        text: `❌ ${error instanceof Error ? error.message : "执行失败"}`,
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
                 disabled={busy || proactiveAgent.isExecuting}
                 className={styles.proactiveExecuteAllButton}
