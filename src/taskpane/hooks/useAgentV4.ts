@@ -181,7 +181,11 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
 
     // 订阅事件
     executor.on("intent:parsed", (data) => {
-      const { intent } = data as unknown as { intent: IntentSpec };
+      const { intent } = (data || {}) as { intent?: IntentSpec };
+      if (!intent) {
+        console.warn("[AgentV4] intent:parsed 事件缺少 intent 数据");
+        return;
+      }
       if (verboseLogging) {
         console.log("[AgentV4] 意图解析完成:", intent.intent);
       }
@@ -209,8 +213,8 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("plan:compiled", (data) => {
-      const { plan } = data as unknown as { plan: { steps: unknown[] } };
-      const stepCount = plan.steps.length;
+      const { plan } = (data || {}) as { plan?: { steps: unknown[] } };
+      const stepCount = plan?.steps?.length ?? 0;
 
       if (verboseLogging) {
         console.log("[AgentV4] 执行计划编译完成:", stepCount, "步");
@@ -233,40 +237,49 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
     });
 
     executor.on("step:start", (data) => {
-      const { step, index, total } = data as unknown as {
-        step: { description: string };
-        index: number;
-        total: number;
+      const { step, index, total } = (data || {}) as {
+        step?: { description?: string };
+        index?: number;
+        total?: number;
       };
+
+      const stepDesc = step?.description ?? "未知步骤";
+      const stepIndex = index ?? 0;
+      const stepTotal = total ?? 1;
 
       setState((prev) => ({
         ...prev,
         progress: prev.progress
           ? {
               ...prev.progress,
-              completedSteps: index,
-              currentStep: step.description,
-              percentage: 40 + Math.round((index / total) * 50),
+              completedSteps: stepIndex,
+              currentStep: stepDesc,
+              percentage: 40 + Math.round((stepIndex / stepTotal) * 50),
             }
           : null,
       }));
 
-      addLog("act", `执行: ${step.description}`);
+      addLog("act", `执行: ${stepDesc}`);
       onEventRef.current?.("step:start", data);
     });
 
     executor.on("step:complete", (data) => {
-      const { step, result, index, total } = data as unknown as {
-        step: { description: string };
-        result: { success: boolean };
-        index: number;
-        total: number;
+      const { step, result, index, total } = (data || {}) as {
+        step?: { description?: string };
+        result?: { success?: boolean };
+        index?: number;
+        total?: number;
       };
 
-      if (result.success) {
-        addLog("observe", `完成: ${step.description}`);
+      const stepDesc = step?.description ?? "未知步骤";
+      const stepIndex = index ?? 0;
+      const stepTotal = total ?? 1;
+      const success = result?.success ?? false;
+
+      if (success) {
+        addLog("observe", `完成: ${stepDesc}`);
       } else {
-        addLog("error", `失败: ${step.description}`);
+        addLog("error", `失败: ${stepDesc}`);
       }
 
       setState((prev) => ({
@@ -274,8 +287,8 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
         progress: prev.progress
           ? {
               ...prev.progress,
-              completedSteps: index + 1,
-              percentage: 40 + Math.round(((index + 1) / total) * 50),
+              completedSteps: stepIndex + 1,
+              percentage: 40 + Math.round(((stepIndex + 1) / stepTotal) * 50),
             }
           : null,
       }));

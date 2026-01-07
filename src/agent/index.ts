@@ -692,3 +692,28 @@ export type {
   RespondSpec,
   ColumnDefinition,
 } from "./types/intent";
+
+// ========== Proactive Agent (主动洞察型 Agent) ==========
+
+// v4.3 新增：主动洞察型 Agent
+export {
+  WorksheetAnalyzer,
+  createWorksheetAnalyzer,
+  InsightGenerator,
+  createInsightGenerator,
+  ProactiveAgent,
+  createProactiveAgent,
+} from "./proactive";
+
+export type {
+  WorksheetAnalysis,
+  ColumnAnalysis,
+  AnalysisIssue,
+  IssueType,
+  TableStructure,
+  InsightReport,
+  Insight,
+  Suggestion,
+  ProactiveAgentState,
+  AgentMessage,
+} from "./proactive";
