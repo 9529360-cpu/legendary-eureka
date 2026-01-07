@@ -4,6 +4,7 @@
  * @description v2.9.12 新增 useSelectionListener, useUndoStack
  * @description v4.0 新增 useAgentV4 (新架构)
  * @description v4.0.1 useAgent 默认使用 v4 架构
+ * @description v4.1 新增 useStreamingAgent (流式输出)
  */
 
 // v4.0: 新架构 - useAgentV4 作为主要 Agent Hook
@@ -16,6 +17,16 @@ export type {
   AgentV4Context as AgentContext,
   AgentV4Status as AgentStatus,
 } from "./useAgentV4";
+
+// v4.1: 流式输出 - useStreamingAgent
+export { useStreamingAgent } from "./useStreamingAgent";
+export type {
+  StreamMessage,
+  StreamStepInfo,
+  StreamingAgentState,
+  UseStreamingAgentOptions,
+  UseStreamingAgentReturn,
+} from "./useStreamingAgent";
 
 // 旧版 Agent Hook（已弃用，保留兼容）
 export { useAgent as useLegacyAgent } from "./useAgent";

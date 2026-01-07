@@ -568,6 +568,49 @@ export type {
   ExecutorEventType,
 } from "./AgentExecutor";
 
+// ========== v4.1 新增模块 ==========
+
+// StreamingAgentExecutor - 流式执行引擎
+export {
+  StreamingAgentExecutor,
+  createStreamingExecutor,
+} from "./StreamingAgentExecutor";
+export type {
+  StreamChunk,
+  StreamChunkType,
+  StreamExecutionOptions,
+  StreamExecutionResult,
+} from "./StreamingAgentExecutor";
+
+// RecoveryManager - 错误恢复管理器
+export {
+  RecoveryManager,
+  createRecoveryManager,
+} from "./RecoveryManager";
+export type {
+  RecoveryAction,
+  RecoveryActionType,
+  RecoveryStrategy,
+  RecoverableStep,
+} from "./RecoveryManager";
+
+// AgentTracer - 追踪与可观测性
+export {
+  AgentTracer,
+  getTracer,
+  createTracer,
+  resetTracer,
+  DEFAULT_TRACER_CONFIG,
+} from "./tracing";
+export type {
+  LogLevel,
+  SpanStatus,
+  LogEntry,
+  Span,
+  TraceData,
+  TracerConfig,
+} from "./tracing";
+
 // 意图类型
 export type {
   IntentSpec,

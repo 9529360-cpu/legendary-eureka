@@ -432,12 +432,12 @@ export class ToolSelector {
     // 2. 生成工具描述（精简版，减少 token）
     const toolDescriptions = selectionResult.tools.map((tool) => ({
       name: tool.name,
-      description: this.compactDescription(tool.description),
+      description: this.compactDescription(tool.description || ""),
       parameters: tool.parameters?.map((p) => ({
         name: p.name,
         type: p.type,
         required: p.required,
-        description: p.description?.substring(0, 50), // 截断描述
+        description: (p.description || "").substring(0, 50), // 截断描述
       })),
     }));
 
@@ -503,8 +503,8 @@ export class ToolSelector {
    * 推断工具元数据
    */
   private inferMetadata(tool: Tool): ToolMetadata {
-    const name = tool.name.toLowerCase();
-    const desc = tool.description.toLowerCase();
+    const name = (tool.name || "").toLowerCase();
+    const desc = (tool.description || "").toLowerCase();
 
     // 推断分类
     let category: ToolCategory = "utility";
@@ -525,7 +525,7 @@ export class ToolSelector {
     }
 
     // 提取关键词
-    const keywords = this.extractKeywords(tool.description);
+    const keywords = this.extractKeywords(tool.description || "");
 
     // 判断是否高风险
     const isHighRisk =
@@ -585,7 +585,7 @@ export class ToolSelector {
     }
 
     // 2. 描述匹配
-    const descWords = tool.description.toLowerCase().split(/\s+/);
+    const descWords = (tool.description || "").toLowerCase().split(/\s+/);
     for (const word of descWords) {
       if (word.length >= 2 && queryLower.includes(word)) {
         score += 10;

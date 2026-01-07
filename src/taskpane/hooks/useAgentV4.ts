@@ -170,7 +170,14 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
   React.useEffect(() => {
     if (executorRef.current) return;
 
-    const executor = createAgentExecutor();
+    let executor: AgentExecutor;
+    try {
+      executor = createAgentExecutor();
+    } catch (error) {
+      console.error("[useAgentV4] Failed to create AgentExecutor:", error);
+      // 创建一个最小化的 executor stub
+      return;
+    }
 
     // 订阅事件
     executor.on("intent:parsed", (data) => {
@@ -454,17 +461,21 @@ export function useAgentV4(options: UseAgentV4Options = {}): UseAgentV4Return {
   React.useEffect(() => {
     if (legacyAgentRef.current) return;
 
-    const agent = new Agent({
-      maxIterations,
-      enableMemory,
-      verboseLogging,
-    });
+    try {
+      const agent = new Agent({
+        maxIterations,
+        enableMemory,
+        verboseLogging,
+      });
 
-    agent.registerTools(createExcelTools());
-    agent.setExcelReader(createExcelReader());
+      agent.registerTools(createExcelTools());
+      agent.setExcelReader(createExcelReader());
 
-    legacyAgentRef.current = agent;
-    console.log("[useAgentV4] Legacy Agent initialized for compatibility");
+      legacyAgentRef.current = agent;
+      console.log("[useAgentV4] Legacy Agent initialized for compatibility");
+    } catch (error) {
+      console.error("[useAgentV4] Failed to initialize legacy Agent:", error);
+    }
   }, [maxIterations, enableMemory, verboseLogging]);
 
   return {

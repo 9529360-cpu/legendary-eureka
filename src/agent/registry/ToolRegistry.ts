@@ -19,18 +19,44 @@ export class ToolRegistry {
   private categories: Map<string, Set<string>> = new Map();
 
   /**
-   * 注册工具
+   * 注册工具（带验证）
    */
   register(tool: Tool): void {
-    this.tools.set(tool.name, tool);
+    // 防御性检查：确保工具对象有效
+    if (!tool) {
+      console.warn("[ToolRegistry] 跳过无效工具: tool is null/undefined");
+      return;
+    }
+
+    // 确保必需字段存在
+    if (!tool.name) {
+      console.warn("[ToolRegistry] 跳过无效工具: 缺少 name 字段");
+      return;
+    }
+
+    // 自动修复缺失的可选字段
+    const safeTool: Tool = {
+      ...tool,
+      description: tool.description || `工具: ${tool.name}`,
+      category: tool.category || "utility",
+      parameters: tool.parameters || [],
+    };
+
+    // 验证参数数组中的每个参数也有 description
+    safeTool.parameters = safeTool.parameters.map((p) => ({
+      ...p,
+      description: p.description || `参数: ${p.name || "unknown"}`,
+    }));
+
+    this.tools.set(safeTool.name, safeTool);
 
     // 更新分类索引
-    if (!this.categories.has(tool.category)) {
-      this.categories.set(tool.category, new Set());
+    if (!this.categories.has(safeTool.category)) {
+      this.categories.set(safeTool.category, new Set());
     }
-    this.categories.get(tool.category)!.add(tool.name);
+    this.categories.get(safeTool.category)!.add(safeTool.name);
 
-    console.log(`[ToolRegistry] Registered tool: ${tool.name} (${tool.category})`);
+    console.log(`[ToolRegistry] Registered tool: ${safeTool.name} (${safeTool.category})`);
   }
 
   /**
@@ -106,10 +132,13 @@ export class ToolRegistry {
     const tools = this.getAll();
     return tools
       .map((tool) => {
-        const params = tool.parameters
-          .map((p) => `  - ${p.name}: ${p.description}${p.required ? " (必需)" : ""}`)
+        const params = (tool.parameters || [])
+          .map(
+            (p) =>
+              `  - ${p.name || "unknown"}: ${p.description || "无描述"}${p.required ? " (必需)" : ""}`
+          )
           .join("\n");
-        return `**${tool.name}** [${tool.category}]\n${tool.description}\n参数:\n${params}`;
+        return `**${tool.name || "unknown"}** [${tool.category || "utility"}]\n${tool.description || "无描述"}\n参数:\n${params}`;
       })
       .join("\n\n");
   }
@@ -150,9 +179,9 @@ export class ToolRegistry {
     const lowerKeyword = keyword.toLowerCase();
     return this.getAll().filter(
       (tool) =>
-        tool.name.toLowerCase().includes(lowerKeyword) ||
-        tool.description.toLowerCase().includes(lowerKeyword) ||
-        tool.category.toLowerCase().includes(lowerKeyword)
+        (tool.name || "").toLowerCase().includes(lowerKeyword) ||
+        (tool.description || "").toLowerCase().includes(lowerKeyword) ||
+        (tool.category || "").toLowerCase().includes(lowerKeyword)
     );
   }
 
@@ -163,22 +192,24 @@ export class ToolRegistry {
     const tool = this.get(toolName);
     if (!tool) return null;
 
+    const params = tool.parameters || [];
+
     return {
-      name: tool.name,
-      description: tool.description,
+      name: tool.name || toolName,
+      description: tool.description || `工具: ${toolName}`,
       parameters: {
         type: "object",
         properties: Object.fromEntries(
-          tool.parameters.map((p) => [
-            p.name,
+          params.map((p) => [
+            p.name || "param",
             {
-              type: p.type,
-              description: p.description,
+              type: p.type || "string",
+              description: p.description || "无描述",
               ...(p.default !== undefined && { default: p.default }),
             },
           ])
         ),
-        required: tool.parameters.filter((p) => p.required).map((p) => p.name),
+        required: params.filter((p) => p.required).map((p) => p.name || "param"),
       },
     };
   }

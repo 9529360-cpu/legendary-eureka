@@ -529,12 +529,12 @@ Include your reasoning in the rationale field.`;
     const toolDescriptions = limitedTools.map((tool) => {
       const params = tool.parameters
         ? tool.parameters
-            .map((p) => `  - ${p.name}: ${p.description} (${p.required ? "必需" : "可选"})`)
+            .map((p) => `  - ${p.name}: ${p.description || ""} (${p.required ? "必需" : "可选"})`)
             .join("\n")
         : "  无参数";
 
       return `### ${tool.name}
-${tool.description}
+${tool.description || ""}
 参数:
 ${params}`;
     });
@@ -552,7 +552,7 @@ ${toolDescriptions.join("\n\n")}`;
    * 构建精简工具描述
    */
   private buildCompactToolSection(tools: Tool[]): string {
-    const descriptions = tools.map((t) => `- ${t.name}: ${t.description.substring(0, 50)}...`);
+    const descriptions = tools.map((t) => `- ${t.name}: ${(t.description || "").substring(0, 50)}...`);
 
     return `## 可用工具
 
