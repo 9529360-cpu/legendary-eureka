@@ -95,6 +95,21 @@ export type AgentEventType =
 
 export type AgentEventHandler = (event: AgentEventType, data: unknown) => void;
 
+/**
+ * 用户意图类型
+ */
+interface Intent {
+  type: "formula_direct" | "formula_natural" | "calculation" | "analyze" | "format" | "data_operation" | "unknown";
+  cell?: string;
+  formula?: string;
+  expression?: string;
+  operation?: "sum" | "average" | "max" | "min";
+  targetCell?: string;
+  sourceRange?: string;
+  scope?: "current" | "all";
+  rawInput?: string;
+}
+
 // ========== 默认配置 ==========
 
 const DEFAULT_CONFIG: ProactiveAgentConfig = {
@@ -489,60 +504,321 @@ export class ProactiveAgent {
   }
 
   private async handleNewRequest(input: string): Promise<string> {
-    // 解析用户指令并执行
+    // 智能意图解析和执行
     this.setState("executing");
 
     try {
-      // 检测是否是公式设置指令（如 K2=E2-F2-J2-J2）
-      const formulaMatch = input.match(/^([A-Z]+\d+)\s*=\s*(.+)$/i);
-      if (formulaMatch) {
-        const [, cell, formula] = formulaMatch;
-        const tool = this.toolRegistry.get("excel_set_formula");
+      // 解析用户意图
+      const intent = this.parseAdvancedIntent(input);
+      
+      this.log("info", `解析意图: ${JSON.stringify(intent)}`);
+
+      switch (intent.type) {
+        case "formula_direct":
+          return await this.executeFormula(intent.cell!, intent.formula!);
         
-        if (!tool) {
-          return `❌ 工具不可用：excel_set_formula`;
-        }
-
-        this.addMessage("action", `正在设置 ${cell} 的公式...`);
-
-        const result = await tool.execute({
-          address: cell,
-          formula: formula.startsWith("=") ? formula : `=${formula}`,
-        });
-
-        this.setState("completed");
-
-        if (result.success) {
-          this.addMessage("result", result.output);
-          return result.output;
-        } else {
-          this.addMessage("error", result.error || "执行失败");
-          return `❌ ${result.error || "执行失败"}`;
-        }
+        case "formula_natural":
+          return await this.executeFormulaFromNatural(intent);
+        
+        case "calculation":
+          return await this.executeCalculation(intent);
+        
+        case "analyze":
+          return await this.executeAnalysis(intent);
+        
+        case "format":
+          return await this.executeFormat(intent);
+        
+        case "data_operation":
+          return await this.executeDataOperation(intent);
+        
+        default:
+          return this.handleUnknownRequest(input);
       }
-
-      // 其他类型的指令 - 尝试通过自然语言理解
-      this.addMessage("action", `处理请求: ${input}`);
-      
-      // 简单的关键词匹配来选择工具
-      if (/求和|sum/i.test(input)) {
-        // 提示用户使用更具体的指令
-        return "请告诉我具体要在哪个单元格设置求和公式，例如：K2=SUM(A2:J2)";
-      }
-      
-      if (/分析|统计/i.test(input)) {
-        // 重新分析当前工作表
-        await this.observeAndAnalyze();
-        return "已重新分析工作表";
-      }
-
-      this.setState("idle");
-      return `我理解你想 "${input}"，但我需要更具体的指令。\n\n例如：\n• K2=E2-F2-J2：设置公式\n• 分析这些数据：重新分析工作表`;
     } catch (error) {
       this.setState("idle");
       this.addMessage("error", error instanceof Error ? error.message : "执行失败");
       return `❌ ${error instanceof Error ? error.message : "执行失败"}`;
     }
+  }
+
+  /**
+   * 高级意图解析 - 理解多种表达方式
+   */
+  private parseAdvancedIntent(input: string): Intent {
+    const normalized = input.trim();
+
+    // 1. 直接公式格式：K2=E2-F2-J2-J2
+    const directFormulaMatch = normalized.match(/^([A-Z]+\d+)\s*=\s*(.+)$/i);
+    if (directFormulaMatch) {
+      return {
+        type: "formula_direct",
+        cell: directFormulaMatch[1],
+        formula: directFormulaMatch[2],
+      };
+    }
+
+    // 2. 自然语言公式：帮我在 K2 设置 E2-F2-J2-J2
+    const naturalFormulaPatterns = [
+      /(?:帮我)?(?:在|给)?([A-Z]+\d+)(?:设置|写入|填入|计算)?(.+)/i,
+      /(?:让|把)?([A-Z]+\d+)(?:等于|=)(.+)/i,
+      /(?:计算|求)?([A-Z]+\d+)(?:的值)?[:：]?(.+)/i,
+    ];
+    
+    for (const pattern of naturalFormulaPatterns) {
+      const match = normalized.match(pattern);
+      if (match) {
+        const [, cell, expression] = match;
+        if (/^[A-Z]+\d+$/i.test(cell)) {
+          return {
+            type: "formula_natural",
+            cell,
+            expression: expression.trim(),
+          };
+        }
+      }
+    }
+
+    // 3. 计算指令：求和、平均、最大值等
+    if (/求和|总和|sum/i.test(normalized)) {
+      const cellMatch = normalized.match(/([A-Z]+\d+)/i);
+      const rangeMatch = normalized.match(/([A-Z]+\d+:[A-Z]+\d+)/i);
+      return {
+        type: "calculation",
+        operation: "sum",
+        targetCell: cellMatch?.[1],
+        sourceRange: rangeMatch?.[1],
+        rawInput: normalized,
+      };
+    }
+
+    if (/平均|平均值|average/i.test(normalized)) {
+      const cellMatch = normalized.match(/([A-Z]+\d+)/i);
+      const rangeMatch = normalized.match(/([A-Z]+\d+:[A-Z]+\d+)/i);
+      return {
+        type: "calculation",
+        operation: "average",
+        targetCell: cellMatch?.[1],
+        sourceRange: rangeMatch?.[1],
+        rawInput: normalized,
+      };
+    }
+
+    if (/最大|max/i.test(normalized)) {
+      return {
+        type: "calculation",
+        operation: "max",
+        rawInput: normalized,
+      };
+    }
+
+    if (/最小|min/i.test(normalized)) {
+      return {
+        type: "calculation",
+        operation: "min",
+        rawInput: normalized,
+      };
+    }
+
+    // 4. 分析指令
+    if (/分析|统计|查看|检查/i.test(normalized)) {
+      return {
+        type: "analyze",
+        scope: normalized.includes("全部") || normalized.includes("所有") ? "all" : "current",
+      };
+    }
+
+    // 5. 格式化指令
+    if (/格式|样式|颜色|加粗|斜体/i.test(normalized)) {
+      return {
+        type: "format",
+        rawInput: normalized,
+      };
+    }
+
+    // 6. 数据操作
+    if (/删除|清除|复制|粘贴|移动/i.test(normalized)) {
+      return {
+        type: "data_operation",
+        rawInput: normalized,
+      };
+    }
+
+    // 未知意图
+    return {
+      type: "unknown",
+      rawInput: normalized,
+    };
+  }
+
+  /**
+   * 执行直接公式
+   */
+  private async executeFormula(cell: string, formula: string): Promise<string> {
+    const tool = this.toolRegistry.get("excel_set_formula");
+    if (!tool) {
+      return `❌ 工具不可用：excel_set_formula`;
+    }
+
+    this.addMessage("action", `正在设置 ${cell} 的公式...`);
+
+    const result = await tool.execute({
+      address: cell,
+      formula: formula.startsWith("=") ? formula : `=${formula}`,
+    });
+
+    this.setState("completed");
+
+    if (result.success) {
+      this.addMessage("result", result.output);
+      return result.output;
+    } else {
+      this.addMessage("error", result.error || "执行失败");
+      return `❌ ${result.error || "执行失败"}`;
+    }
+  }
+
+  /**
+   * 从自然语言解析并执行公式
+   */
+  private async executeFormulaFromNatural(intent: Intent): Promise<string> {
+    const { cell, expression } = intent;
+    
+    if (!cell || !expression) {
+      return "❌ 无法解析单元格地址或表达式";
+    }
+
+    // 尝试理解表达式
+    let formula = expression;
+    
+    // 处理常见的自然语言模式
+    // "E2 减 F2 再减 J2" -> "E2-F2-J2"
+    formula = formula
+      .replace(/\s*减去?\s*/g, "-")
+      .replace(/\s*加上?\s*/g, "+")
+      .replace(/\s*乘以?\s*/g, "*")
+      .replace(/\s*除以?\s*/g, "/")
+      .replace(/的和|求和/g, "SUM")
+      .replace(/平均/g, "AVERAGE")
+      .replace(/最大/g, "MAX")
+      .replace(/最小/g, "MIN");
+
+    this.addMessage("action", `理解为：${cell} = ${formula}`);
+    
+    return await this.executeFormula(cell, formula);
+  }
+
+  /**
+   * 执行计算操作
+   */
+  private async executeCalculation(intent: Intent): Promise<string> {
+    const { operation, targetCell, sourceRange, rawInput } = intent;
+
+    // 尝试从输入中提取信息
+    let cell = targetCell;
+    let range = sourceRange;
+
+    if (!cell || !range) {
+      // 尝试智能推断
+      const suggestion = this.suggestCalculation(operation!, rawInput!);
+      return suggestion;
+    }
+
+    // 构建公式
+    let formula = "";
+    switch (operation) {
+      case "sum":
+        formula = `SUM(${range})`;
+        break;
+      case "average":
+        formula = `AVERAGE(${range})`;
+        break;
+      case "max":
+        formula = `MAX(${range})`;
+        break;
+      case "min":
+        formula = `MIN(${range})`;
+        break;
+      default:
+        return `❌ 不支持的操作：${operation}`;
+    }
+
+    this.addMessage("action", `理解为：在 ${cell} 计算 ${formula}`);
+    return await this.executeFormula(cell, formula);
+  }
+
+  /**
+   * 智能建议计算公式
+   */
+  private suggestCalculation(operation: string, input: string): string {
+    const opName = {
+      sum: "求和",
+      average: "平均值",
+      max: "最大值",
+      min: "最小值",
+    }[operation] || operation;
+
+    return `我理解你想要计算${opName}。
+
+请告诉我：
+1. 要把结果放在哪个单元格？（如 K2）
+2. 要计算哪个范围的数据？（如 E2:J2）
+
+例如：
+• 在 K2 求和 E2:J2
+• K2=SUM(E2:J2)`;
+  }
+
+  /**
+   * 执行分析
+   */
+  private async executeAnalysis(intent: Intent): Promise<string> {
+    this.addMessage("action", "重新分析工作表...");
+    await this.observeAndAnalyze();
+    this.setState("completed");
+    return "✅ 已完成分析，请查看上面的洞察和建议。";
+  }
+
+  /**
+   * 执行格式化
+   */
+  private async executeFormat(intent: Intent): Promise<string> {
+    this.setState("idle");
+    return `格式化功能正在开发中。
+
+你可以尝试：
+• 选中单元格后点击 Excel 的格式化按钮
+• 或者告诉我具体要设置什么格式`;
+  }
+
+  /**
+   * 执行数据操作
+   */
+  private async executeDataOperation(intent: Intent): Promise<string> {
+    this.setState("idle");
+    return `数据操作功能正在开发中。
+
+你可以尝试：
+• 使用 Excel 的编辑功能
+• 或者告诉我具体要做什么操作`;
+  }
+
+  /**
+   * 处理未知请求
+   */
+  private handleUnknownRequest(input: string): string {
+    this.setState("idle");
+    
+    return `我还在学习理解 "${input}"。
+
+目前我可以帮你：
+• 设置公式：K2=E2-F2-J2-J2
+• 自然语言：帮我在 K2 计算 E2 减 F2
+• 求和：在 K2 求和 E2:J2
+• 平均值：K2 的平均值是 E2:J2
+• 分析：重新分析这个表格
+
+你想做什么？`;
   }
 
   private handleUnknownIntent(input: string): string {
