@@ -654,6 +654,28 @@ export type {
   PersistentMemoryConfig,
 } from "./memory";
 
+// SmartOrchestrator - 智能编排器 (Phase 3)
+export {
+  SmartOrchestrator,
+  createSmartOrchestrator,
+} from "./SmartOrchestrator";
+export type {
+  OrchestrationOptions,
+  OrchestrationProgress,
+  OrchestrationResult,
+} from "./SmartOrchestrator";
+
+// DynamicPromptBuilder - 动态提示构建器 (Phase 3)
+export {
+  DynamicPromptBuilder,
+  createDynamicPromptBuilder,
+} from "./DynamicPromptBuilder";
+export type {
+  PromptBuilderConfig,
+  PromptBuildContext,
+  PromptBuildResult,
+} from "./DynamicPromptBuilder";
+
 // 意图类型
 export type {
   IntentSpec,
