@@ -489,9 +489,60 @@ export class ProactiveAgent {
   }
 
   private async handleNewRequest(input: string): Promise<string> {
-    // 这里可以集成原有的 Agent 能力
-    // 暂时返回提示
-    return `好的，你想让我 "${input}"。让我来处理...`;
+    // 解析用户指令并执行
+    this.setState("executing");
+
+    try {
+      // 检测是否是公式设置指令（如 K2=E2-F2-J2-J2）
+      const formulaMatch = input.match(/^([A-Z]+\d+)\s*=\s*(.+)$/i);
+      if (formulaMatch) {
+        const [, cell, formula] = formulaMatch;
+        const tool = this.toolRegistry.get("excel_set_formula");
+        
+        if (!tool) {
+          return `❌ 工具不可用：excel_set_formula`;
+        }
+
+        this.addMessage("action", `正在设置 ${cell} 的公式...`);
+
+        const result = await tool.execute({
+          address: cell,
+          formula: formula.startsWith("=") ? formula : `=${formula}`,
+        });
+
+        this.setState("completed");
+
+        if (result.success) {
+          this.addMessage("result", result.output);
+          return result.output;
+        } else {
+          this.addMessage("error", result.error || "执行失败");
+          return `❌ ${result.error || "执行失败"}`;
+        }
+      }
+
+      // 其他类型的指令 - 尝试通过自然语言理解
+      this.addMessage("action", `处理请求: ${input}`);
+      
+      // 简单的关键词匹配来选择工具
+      if (/求和|sum/i.test(input)) {
+        // 提示用户使用更具体的指令
+        return "请告诉我具体要在哪个单元格设置求和公式，例如：K2=SUM(A2:J2)";
+      }
+      
+      if (/分析|统计/i.test(input)) {
+        // 重新分析当前工作表
+        await this.observeAndAnalyze();
+        return "已重新分析工作表";
+      }
+
+      this.setState("idle");
+      return `我理解你想 "${input}"，但我需要更具体的指令。\n\n例如：\n• K2=E2-F2-J2：设置公式\n• 分析这些数据：重新分析工作表`;
+    } catch (error) {
+      this.setState("idle");
+      this.addMessage("error", error instanceof Error ? error.message : "执行失败");
+      return `❌ ${error instanceof Error ? error.message : "执行失败"}`;
+    }
   }
 
   private handleUnknownIntent(input: string): string {
